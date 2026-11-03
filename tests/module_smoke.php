@@ -26,13 +26,14 @@ class IPSModuleStrict {
   protected function GetIDForIdent(string $a):int{return crc32($a)&0x7fffffff;}
 }
 $GLOBALS['archiveEvents']=[];
+$GLOBALS['hiddenVars']=[];
 $GLOBALS['archiveAvailable']=true;
 $GLOBALS['archiveAggregation']=0;
 $GLOBALS['semaphoreLocked']=false;
 function IPS_SemaphoreEnter(string $name,int $timeout):bool {if ($GLOBALS['semaphoreLocked']) return false; $GLOBALS['semaphoreLocked']=true;return true;}
 function IPS_SemaphoreLeave(string $name):void {$GLOBALS['semaphoreLocked']=false;}
 
-function IPS_SetHidden(int $var,bool $hidden):void{}
+function IPS_SetHidden(int $var,bool $hidden):void{$GLOBALS['hiddenVars'][$var]=$hidden;}
 function IPS_GetInstanceListByModuleID(string $id):array{return [19];}
 function AC_GetLoggingStatus(int $id,int $var):bool{return !empty($GLOBALS['archived']);}
 function AC_GetAggregationType(int $id,int $var):int{return $GLOBALS['archiveAggregation'];}
@@ -41,6 +42,11 @@ function AC_SetAggregationType(int $id,int $var,int $type):bool{$GLOBALS['archiv
 function IPS_ApplyChanges(int $id):void{}
 function AC_AddLoggedValues(int $id,int $var,array $v):bool {if (!empty($GLOBALS['archiveFail'])) return false;$GLOBALS['archiveEvents']=array_merge($GLOBALS['archiveEvents'],$v);return true;}
 function AC_ReAggregateVariable(int $id,int $var):void{}
+function AC_GetLoggedValues(int $id,int $var,int $start,int $end,int $limit):array {
+  $rows=array_values(array_filter($GLOBALS['archiveEvents'], fn($r)=>$r['TimeStamp'] >= $start && $r['TimeStamp'] <= $end));
+  usort($rows, fn($a,$b)=>$b['TimeStamp']<=>$a['TimeStamp']);
+  return $limit>0 ? array_slice($rows,0,$limit) : array_slice($rows,0,10000);
+}
 require_once __DIR__.'/../SuruWaterMonitor/module.php';
 class MockApi extends SuruApi {
   public array $r=[];
@@ -125,4 +131,28 @@ t($m->values['State']==='BETRIEBSBEREIT – BASIC','automatic recovery after tra
 $m->mock->returnedUnits=[['id'=>'another-unit']];
 $m->RequestAction('Poll',true);
 t($m->values['State']==='ZÄHLERZUORDNUNG GEÄNDERT','replacement meter blocked to preserve history');
+// Version upgrade never resets existing archive and exposes a native HTML tile.
+$oldArchiveCount=count($GLOBALS['archiveEvents']);
+t(str_contains($m->values['Dashboard'],'Wasserverbrauch'),'dashboard HTML generated');
+t(str_contains($m->values['Dashboard'],'Zählerstand'),'dashboard includes latest meter title');
+// Check daily time series using the existing archived counter without any extra API call.
+$GLOBALS['archiveEvents']=[];
+$m2=new MockModule();$m2->Create();$m2->props['Email']='me@example.org';$m2->props['Password']='fake';$m2->ApplyChanges();
+$today=time()-300;
+for($d=1;$d<=365;$d++) $GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-$d*86400,'Value'=>1000.0-$d*.005];
+$m2->mock->r=['reading'=>1000.0,'measuredAt'=>gmdate('c',$today)];
+$m2->RequestAction('Poll',true);
+t(abs($m2->values['Consumption24h']-5.0)<.001,'daily consumption from archive');
+t(abs($m2->values['Consumption7d']-35.0)<.001,'weekly consumption from archive');
+t(abs($m2->values['Consumption30d']-150.0)<.001,'30-day consumption from archive');
+t(abs($m2->values['Consumption365d']-1825.0)<.001,'365-day consumption from archive');
+t($GLOBALS['hiddenVars'][(crc32('Consumption365d')&0x7fffffff)]===false,'complete history exposes annual numeric variable');
+t(str_contains($m2->values['Dashboard'],'1.000,000'),'latest meter reading in HTML tile');
+t(str_contains($m2->values['Dashboard'],'Letzte 365 Tage'),'year period in HTML tile');
+// Missing historical samples must hide numeric variables, never present fictitious zero.
+$GLOBALS['archiveEvents']=[];
+$m3=new MockModule();$m3->Create();$m3->props['Email']='me@example.org';$m3->props['Password']='fake';$m3->ApplyChanges();
+$m3->mock->r=['reading'=>12.345,'measuredAt'=>gmdate('c',$today)];$m3->RequestAction('Poll',true);
+t($GLOBALS['hiddenVars'][(crc32('Consumption7d')&0x7fffffff)]===true,'short history hides unavailable week');
+t(str_contains($m3->values['Dashboard'],'Noch nicht genügend Messwerte'),'unavailable values shown as pending');
 echo "ALL MODULE TESTS PASSED\n";
