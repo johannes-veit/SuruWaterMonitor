@@ -1,32 +1,20 @@
-SURU WATERMONITOR BASIC FÜR SYMBOX – INSTALLATION v0.1.3
+SURU WATERMONITOR – UPDATE v0.1.5 (NATIVE VARIABLEN)
 
-1. Bestehendes kostenloses WaterMonitor-BASIC-Konto verwenden.
-2. Ein neues GitHub-Repository SuruWaterMonitor erstellen und den INHALT dieses
-   Pakets ins Stammverzeichnis hochladen; library.json liegt dort oben.
-3. IP-Symcon 9.0 -> Kern-Instanzen -> Modules -> GitHub-URL hinzufügen.
-4. Instanz SuruWaterMonitor anlegen.
-5. Nur E-Mail und Passwort der WaterMonitor-App eingeben und Übernehmen.
-6. Der automatische Offline-Selbsttest startet sofort. Ein erster Cloudabruf
-   wird mit 10 Sekunden Verzögerung eingeplant; regelmäßige Abrufe alle 60 Minuten.
-7. Status, Messzeitpunkt, Zählerstand und Diagnose in der Instanz kontrollieren.
+1. IP-Symcon -> Kern-Instanzen -> Modules -> SuruWaterMonitor aktualisieren.
+2. Die bestehende Instanz öffnen und "Übernehmen" drücken.
+3. In der Standard-Visualisierung nur die gewünschten Variablen anzeigen:
+   - Zählerstand (m³) [Meter]
+   - Messzeitpunkt [MeasuredAt]
+   - Verbrauch letzte 24 Stunden [Consumption24h]
+   - Verbrauch letzte 7 Tage [Consumption7d]
+   - Verbrauch letzte 30 Tage [Consumption30d]
+   - Verbrauch letzte 365 Tage [Consumption365d]
+4. Das nicht mehr benötigte Dashboard aus v0.1.4 wird automatisch entfernt.
+5. Zugangsdaten, Archive und Zählerwerte bleiben erhalten.
 
-Nur-Lesen-Zugriff auf Cloud-Zählerstand. Keine kostenpflichtigen Consumption-
-Endpunkte, kein zusätzliches Gerät, Home Assistant oder separater Rechner.
+Anfangs fehlen historische Messdaten für längere Zeiträume; diese Variablen werden
+bei ausreichend Archivwerten einmalig eingeblendet. Danach bleibt eine
+manuelle Ausblendung erhalten. Vor der ersten gültigen Berechnung kann
+eine manuell eingeblendete Float-Variable technisch den Startwert 0 zeigen.
 
-Vorsicht: Passwort wird als Symcon-Instanzeigenschaft gespeichert. Das
-Passwort-Eingabefeld maskiert nur die Darstellung, nicht die Speicherung.
-
-Offline-Test bestanden; reale Cloud-Anmeldung, BASIC-Berechtigung und Betrieb
-auf der persönlichen SymBox sind weiterhin NICHT geprüft und können erst nach
-Installation mit den privaten Zugangsdaten bestätigt werden.
-
-Beim Austausch des Wasserzählers oder Wechsels des Benutzerkontos zur
-Vermeidung vermischter Archivdaten eine separate Instanz verwenden.
-
-
-UPDATE AUF 0.1.4 (Verbrauchskachel):
-1. Modulverwaltung -> SuruWaterMonitor -> Aktualisierung prüfen / Update installieren.
-2. Bestehende SuruWaterMonitor-Instanz öffnen -> Übernehmen.
-3. Neue Variable "Wasserverbrauch – Übersicht" (Dashboard) in der Visualisierung als Webinhalt-Kachel platzieren.
-4. Die vier Verbrauchsvariablen werden automatisch erzeugt. Sobald genügend Messwerte vorhanden sind, werden sie sichtbar.
-5. Keine neue Kontoanmeldung, kein Zurücksetzen des Archivs, keine neue Zähleraktivierung.
+Nur Lesen, WaterMonitor BASIC. Kein Home Assistant, keine Webinhalt-Kachel.
