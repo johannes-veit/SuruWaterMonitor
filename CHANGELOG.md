@@ -1,3 +1,11 @@
+## 0.1.5 (2026-11-03)
+
+- Die HTML-/Webinhalt-Kachel `Dashboard` wird nicht mehr erstellt; ältere Dashboard-Variable wird bei `ApplyChanges()` deregistriert.
+- Wasserzählerstand, Messzeitpunkt und alle Verbrauchszeiträume bleiben normale Symcon-Variablen.
+- Eigene Auswahl der eingeblendeten Werte im Standard-WebFront bleibt nach einmaliger Datenverfügbarkeit bestehen; weitere Abfragen überschreiben keine Sichtbarkeit.
+- Kein Einfluss auf Archiv, Cloud-Anmeldung, bestehende Zählerzuordnung oder BASIC-Datenzugriff.
+- Modultests um Migration und Benutzer-Sichtbarkeit erweitert.
+
 ## 0.1.4 (2026-11-03)
 
 - Vier neue Verbrauchsvariablen (ca. 24 h, 7, 30 und 365 Tage) aus dem vorhandenen m³-Zählerarchiv.
