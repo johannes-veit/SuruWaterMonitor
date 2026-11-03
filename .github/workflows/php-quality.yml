@@ -25,6 +25,8 @@ jobs:
         run: php -r 'foreach (["library.json", "SuruWaterMonitor/module.json", "SuruWaterMonitor/form.json"] as $f) { json_decode(file_get_contents($f), true, 512, JSON_THROW_ON_ERROR); echo "$f OK\n"; }'
       - name: Pure function and crypto tests
         run: php tests/unit_tests.php
+      - name: Rolling consumption calculations (mock)
+        run: php tests/consumption_tests.php
       - name: API protocol tests (mock, no login)
         run: php tests/api_protocol.php
       - name: Symcon module simulation (mock)
