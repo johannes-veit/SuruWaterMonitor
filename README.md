@@ -2,10 +2,26 @@
 
 Inoffizielles, **rein lesendes** IP-Symcon-Modul zur Auswertung eines SURU-/WaterMonitor-Kontos. Entwickelt mit Fokus auf das **kostenlose BASIC-Konto** und die SymBox. Kein Home Assistant, keine zusätzliche Hardware, keine kostenpflichtigen SURU-Funktionen.
 
+## Stand v0.1.4: Rollierende Verbräuche + Visualisierungs-Kachel
+
+**Erfolgreich live verifiziert:** SURU BASIC Login und Gesamtzählerstand am 03.11.2026 anhand der vom Nutzer übermittelten Symcon-LIVE-Diagnose. Fortlaufende historische Messwerte sind noch nicht belegt.
+
+Neu erzeugt die Modulinstanz direkt folgende **vier Float-Variablen in Litern**:
+- `Consumption24h`: Verbrauch zwischen zwei Messungen in 18–30 Stunden Abstand (etwa letzte 24 h).
+- `Consumption7d`: Verbrauch der letzten 7 × 24 Stunden.
+- `Consumption30d`: Verbrauch der letzten 30 × 24 Stunden.
+- `Consumption365d`: Verbrauch der letzten 365 × 24 Stunden.
+
+Die Zeitfenster enden beim **letzten tatsächlichen Messzeitpunkt** des Zählers, nicht beim Zeitpunkt des Cloud-Abrufs. Für 7/30/365 Tage wird ein gespeicherter Zählerstand im Zeitfenster ±18 Stunden um die Zielgrenze gewählt; das Ergebnis ist deshalb als **≈ Näherung** gekennzeichnet. Es findet keine künstliche Hochrechnung bei fehlender Datenhistorie statt. Fehlt ein geeigneter Zählerstand, wird die Variable in der Objektansicht ausgeblendet und in der Kachel `— / Noch nicht genügend Messwerte` angezeigt. Ein gemessener Nullverbrauch ist dagegen 0 Liter.
+
+**Kachel-Visualisierung und Standard-WebFront:** Die Modulinstanz erstellt die String-Variable `Dashboard` (`Wasserverbrauch – Übersicht`) mit Symcon-Darstellung *Webinhalt / HTML*. Als eigene Kachel in der Visualisierung anzeigen. Der Großwert zeigt m³ und den Messzeitpunkt; darunter stehen die vier Verbrauchszeiträume. Der Inhalt wird bei jeder neu angenommenen Messung und bei Fehlerstatus aktualisiert, ohne externe Skripte oder Internet-CDNs.
+
+**Updatesicherheit:** Vorhandene Variablen-Idents, GUIDs und Archivwerte aus v0.1.3 werden übernommen. In `ApplyChanges` wird nur die bestehende Historie ausgewertet; es erfolgt dort kein Cloud-Aufruf. Die bisherigen Variablen `Delta` (seit letzter Messung) und `Month` (seit erster Messung im laufenden Monat) bleiben unverändert.
+
 ## Wichtiger Status
 
 - **Code und Offline-Tests vorhanden und bestanden.**
-- **Live-Anmeldung und API-Kompatibilität am konkreten Konto noch nicht geprüft**, da kein Zugriff auf das Konto des Nutzers besteht.
+- **Live-Anmeldung am 03.11.2026 vom Nutzer als erfolgreich gemeldet**. Die neue Berechnung ist offline getestet, die Folgemessungen noch nicht live bestätigt.
 - Die Cloud-Schnittstelle ist inoffiziell und kann sich ändern.
 - Die BASIC-App des Nutzers zeigt inzwischen echte Werte an; die Cloud-Abfragen des Symcon-Moduls müssen jedoch erstmals auf der SymBox getestet werden.
 
@@ -62,7 +78,7 @@ Basiert in der Protokollbeschreibung auf dem MIT-lizenzierten Projekt [teuffel/h
 - Das kostenlose Konto muss vom Betreiber verifiziert und einem Zähler zugeordnet sein.
 - Wenn SURU nur einmal täglich neue Messwerte liefert, kann das Modul trotz stündlicher Abfrage nicht mehr Messpunkte erzeugen.
 - API-Felder und Rollen können sich jederzeit ändern.
-- Die hier entwickelte Version 0.1.3 ist **offline getestet, aber nicht auf einer realen SymBox und nicht mit einem freigeschalteten SURU-BASIC-Konto live verifiziert**.
+- Stand v0.1.4: Anmeldung und erster Zählerwert wurden mit v0.1.3 live bestätigt. Der neue rollierende Verlauf und die HTML-Kachel sind offline simuliert und müssen in der Visualisierung überprüft werden.
 
 ## SymBox-/PHP-Architektur
 
@@ -80,3 +96,10 @@ Die mitgelieferte Montgomery-BigInteger-Routine verwendet auf PHP mit 64-Bit-Int
 - Archivkonfiguration: Beim Korrigieren des Zählertyps wird `IPS_ApplyChanges` sicher ausgeführt.
 - Keine persönliche Zähler-Seriennummer mehr im öffentlichen GitHub-Quelltext oder in Tests. Bei Einzelzähler automatische Auswahl.
 - Bestehende Modul-GUIDs und Variablen-Idents aus v0.1.2 unverändert.
+
+## Nachprüfung v0.1.4
+
+- Neue reine Rechenbibliothek `libs/Consumption.php`, eigene Grenz-/Lücken-/Nullverbrauch-Tests.
+- Rechenwerte und responsive Symcon-Webinhalt-Kachel (keine Cloud-Erweiterung, unveränderter BASIC-API-Zugriff).
+- Die neue HTML-Kachel enthält nur aggregierte Verbräuche und nie Anmeldedaten.
+- Testlauf: `php tests/consumption_tests.php`, `php tests/module_smoke.php`, `php tests/unit_tests.php`, `php tests/api_protocol.php`.
