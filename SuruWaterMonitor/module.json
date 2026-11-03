@@ -1,0 +1,15 @@
+{
+  "id": "{A5790551-917F-4B54-9E76-5A427329A6C1}",
+  "name": "SuruWaterMonitor",
+  "type": 3,
+  "vendor": "SURU (inoffiziell)",
+  "aliases": [
+    "WaterMonitor BASIC",
+    "SURU Wasserzähler"
+  ],
+  "url": "",
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "SURUW"
+}

@@ -1,0 +1,24 @@
+SURU WATERMONITOR BASIC FÜR SYMBOX – INSTALLATION v0.1.3
+
+1. Bestehendes kostenloses WaterMonitor-BASIC-Konto verwenden.
+2. Ein neues GitHub-Repository SuruWaterMonitor erstellen und den INHALT dieses
+   Pakets ins Stammverzeichnis hochladen; library.json liegt dort oben.
+3. IP-Symcon 9.0 -> Kern-Instanzen -> Modules -> GitHub-URL hinzufügen.
+4. Instanz SuruWaterMonitor anlegen.
+5. Nur E-Mail und Passwort der WaterMonitor-App eingeben und Übernehmen.
+6. Der automatische Offline-Selbsttest startet sofort. Ein erster Cloudabruf
+   wird mit 10 Sekunden Verzögerung eingeplant; regelmäßige Abrufe alle 60 Minuten.
+7. Status, Messzeitpunkt, Zählerstand und Diagnose in der Instanz kontrollieren.
+
+Nur-Lesen-Zugriff auf Cloud-Zählerstand. Keine kostenpflichtigen Consumption-
+Endpunkte, kein zusätzliches Gerät, Home Assistant oder separater Rechner.
+
+Vorsicht: Passwort wird als Symcon-Instanzeigenschaft gespeichert. Das
+Passwort-Eingabefeld maskiert nur die Darstellung, nicht die Speicherung.
+
+Offline-Test bestanden; reale Cloud-Anmeldung, BASIC-Berechtigung und Betrieb
+auf der persönlichen SymBox sind weiterhin NICHT geprüft und können erst nach
+Installation mit den privaten Zugangsdaten bestätigt werden.
+
+Beim Austausch des Wasserzählers oder Wechsels des Benutzerkontos zur
+Vermeidung vermischter Archivdaten eine separate Instanz verwenden.

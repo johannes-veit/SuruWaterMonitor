@@ -1,0 +1,63 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Kostenloses WaterMonitor BASIC-Konto. Keine Zusatzhardware und kein PLUS-Abo."
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "Email",
+      "caption": "WaterMonitor E-Mail"
+    },
+    {
+      "type": "PasswordTextBox",
+      "name": "Password",
+      "caption": "WaterMonitor Passwort"
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Optionale Einstellungen (nur bei Bedarf)",
+      "items": [
+        {
+          "type": "ValidationTextBox",
+          "name": "MeterSerial",
+          "caption": "Zähler-Seriennummer (nur bei mehreren Zählern)"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "IntervalMinutes",
+          "caption": "Abrufintervall in Minuten",
+          "minimum": 30,
+          "maximum": 1440
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Label",
+      "caption": "Status wird nach dem Speichern automatisch geprüft"
+    },
+    {
+      "type": "Label",
+      "caption": "Vollständige Diagnose steht in der Variable Selbsttest / Diagnose"
+    },
+    {
+      "type": "Button",
+      "caption": "Jetzt automatisch prüfen",
+      "onClick": "IPS_RequestAction($id, \"Poll\", true);"
+    },
+    {
+      "type": "Button",
+      "caption": "Offline-Selbsttests ausführen",
+      "onClick": "IPS_RequestAction($id, \"OfflineTest\", true);"
+    }
+  ],
+  "status": [
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Bereit"
+    }
+  ]
+}
