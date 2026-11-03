@@ -22,3 +22,11 @@ Installation mit den privaten Zugangsdaten bestätigt werden.
 
 Beim Austausch des Wasserzählers oder Wechsels des Benutzerkontos zur
 Vermeidung vermischter Archivdaten eine separate Instanz verwenden.
+
+
+UPDATE AUF 0.1.4 (Verbrauchskachel):
+1. Modulverwaltung -> SuruWaterMonitor -> Aktualisierung prüfen / Update installieren.
+2. Bestehende SuruWaterMonitor-Instanz öffnen -> Übernehmen.
+3. Neue Variable "Wasserverbrauch – Übersicht" (Dashboard) in der Visualisierung als Webinhalt-Kachel platzieren.
+4. Die vier Verbrauchsvariablen werden automatisch erzeugt. Sobald genügend Messwerte vorhanden sind, werden sie sichtbar.
+5. Keine neue Kontoanmeldung, kein Zurücksetzen des Archivs, keine neue Zähleraktivierung.
