@@ -1,0 +1,27 @@
+name: PHP quality checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, openssl, json
+          coverage: none
+      - name: PHP lint
+        run: find . -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Symcon JSON manifests and form
+        run: php -r 'foreach (["library.json", "SuruWaterMonitor/module.json", "SuruWaterMonitor/form.json"] as $f) { json_decode(file_get_contents($f), true, 512, JSON_THROW_ON_ERROR); echo "$f OK\n"; }'
+      - name: Pure function and crypto tests
+        run: php tests/unit_tests.php
+      - name: API protocol tests (mock, no login)
+        run: php tests/api_protocol.php
+      - name: Symcon module simulation (mock)
+        run: php tests/module_smoke.php
