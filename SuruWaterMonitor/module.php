@@ -2,11 +2,12 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../libs/SuruApi.php';
 require_once __DIR__ . '/../libs/Meter.php';
+require_once __DIR__ . '/../libs/Consumption.php';
 
 /** Unofficial read-only SURU BASIC connection for IP-Symcon >= 8.1. */
 class SuruWaterMonitor extends IPSModuleStrict
 {
-    private const VERSION = '0.1.3';
+    private const VERSION = '0.1.4';
     private const ARCHIVE_MODULE = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
 
     public function Create(): void
@@ -28,12 +29,23 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->RegisterAttributeString('LastReport', '');
         $this->RegisterAttributeString('MeterBinding', '');
         $this->RegisterAttributeString('LastFullSelftest', 'noch nicht ausgeführt');
+        $this->RegisterAttributeString('PeriodReadiness', '{}');
         $this->RegisterTimer('Poll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('FirstPoll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('Retry', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
+        // String Webinhalt: supported natively by Symcon tile visualization and WebFront.
+        $this->RegisterVariableString('Dashboard', 'Wasserverbrauch – Übersicht', [
+            'PRESENTATION' => '{9DE1D610-5106-97FB-714D-1AADEDF8377A}',
+            'HTML_TYPE' => 0,
+            'PADDING' => true,
+        ], 5);
         $this->RegisterVariableFloat('Meter', 'Zählerstand (m³)', [], 10);
         $this->RegisterVariableFloat('Delta', 'Verbrauch seit letzter Messung (Liter)', [], 20);
         $this->RegisterVariableFloat('Month', 'Verbrauch seit erster Monatsmessung (Liter)', [], 30);
+        $this->RegisterVariableFloat('Consumption24h', 'Verbrauch letzte 24 Stunden (Liter)', [], 32);
+        $this->RegisterVariableFloat('Consumption7d', 'Verbrauch letzte 7 Tage (Liter)', [], 34);
+        $this->RegisterVariableFloat('Consumption30d', 'Verbrauch letzte 30 Tage (Liter)', [], 36);
+        $this->RegisterVariableFloat('Consumption365d', 'Verbrauch letzte 365 Tage (Liter)', [], 38);
         $this->RegisterVariableString('MeasuredAt', 'Messzeitpunkt', [], 40);
         $this->RegisterVariableString('LastSync', 'Letzter erfolgreicher Cloud-Abruf', [], 45);
         $this->RegisterVariableString('State', 'SURU-Status', [], 50);
@@ -60,6 +72,7 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->WriteAttributeString('LastFullSelftest', $this->testsOk($test) ? 'OK' : 'FEHLER');
         $this->writeReport('OFFLINE-PRÜFUNG', $test);
         if (!$valid) $this->SetValue('State', 'WARTE AUF WATERMONITOR BASIC KONTO');
+        $this->refreshConsumption(); // only local archive; no cloud requests during updates
     }
 
     public function GetConfigurationForm(): string
@@ -188,6 +201,7 @@ class SuruWaterMonitor extends IPSModuleStrict
         $test['Erneuter Versuch'] = $retryMinutes > 0 ? 'in ca. ' . $retryMinutes . ' Minuten' : 'nach dem regulären Abrufintervall';
         $this->writeReport($state, $test);
         $this->SetTimerInterval('Retry', $retryMinutes > 0 ? $retryMinutes * 60000 : 0);
+        $this->renderDashboard($this->currentConsumption());
     }
 
     /** A semaphore prevents parallel manual and scheduled polls from writing the same sample. */
@@ -246,11 +260,13 @@ class SuruWaterMonitor extends IPSModuleStrict
                 $this->WriteAttributeFloat('LastValue', $parsed['value']);
                 $this->WriteAttributeInteger('LastTimestamp', $parsed['timestamp']);
                 $this->updateMonth($parsed['value'], $parsed['timestamp']);
+                $this->refreshConsumption();
             }
             if ($priorBinding === '') $this->WriteAttributeString('MeterBinding', $binding);
             $this->SetValue('LastSync', date('d.m.Y H:i:s'));
             $age = max(0, time() - $parsed['timestamp']);
             $this->SetValue('State', $age > 48 * 3600 ? 'DATEN VERALTET' : 'BETRIEBSBEREIT – BASIC');
+            $this->renderDashboard($this->currentConsumption());
             $t = $this->offlineSelfTest();
             $t['Anmeldung'] = 'OK – eigenes SURU-Konto';
             $t['BASIC Gesamtzählerstand'] = 'OK';
@@ -332,5 +348,106 @@ class SuruWaterMonitor extends IPSModuleStrict
             $this->WriteAttributeFloat('MonthAnchor', $value);
         }
         $this->SetValue('Month', max(0, round(($value - $this->ReadAttributeFloat('MonthAnchor')) * 1000, 3)));
+    }
+
+    /** Calculate from the existing timestamp archive; never touches vendor's paid endpoints. */
+    private function refreshConsumption(): void
+    {
+        $lastTime = $this->ReadAttributeInteger('LastTimestamp');
+        $lastValue = $this->ReadAttributeFloat('LastValue');
+        $periods = ['24h' => null, '7d' => null, '30d' => null, '365d' => null];
+        if ($lastTime > 0 && $lastValue >= 0 && function_exists('AC_GetLoggedValues')) {
+            try {
+                $archives = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE);
+                if ($archives) {
+                    // Daily samples require only ~370 rows, and nothing is backdated.
+                    $from = $lastTime - 365 * 86400 - 18 * 3600;
+                    $history = AC_GetLoggedValues((int) $archives[0], $this->GetIDForIdent('History'), $from, $lastTime, 0);
+                    if (is_array($history)) {
+                        $periods = SuruConsumption::calculate($history, $lastTime, $lastValue);
+                    }
+                }
+            } catch (Throwable $ignored) {
+                // A temporary archive failure must not fabricate consumption values.
+            }
+        }
+        $idents = ['24h' => 'Consumption24h', '7d' => 'Consumption7d', '30d' => 'Consumption30d', '365d' => 'Consumption365d'];
+        foreach ($idents as $key => $ident) {
+            $liters = $periods[$key];
+            $variable = $this->GetIDForIdent($ident);
+            if ($liters !== null) {
+                if (abs((float) $this->GetValue($ident) - $liters) > 0.0001) {
+                    $this->SetValue($ident, $liters);
+                }
+            }
+            IPS_SetHidden($variable, $liters === null); // no deceptive zero values in the object tree
+        }
+        $this->WriteAttributeString('PeriodReadiness', json_encode(array_map(
+            static fn($value) => $value !== null, $periods
+        ), JSON_THROW_ON_ERROR));
+        $this->renderDashboard($periods);
+    }
+
+    /** @return array<string,float|null> */
+    private function currentConsumption(): array
+    {
+        $ready = json_decode($this->ReadAttributeString('PeriodReadiness'), true);
+        $result = [];
+        foreach (['24h' => 'Consumption24h', '7d' => 'Consumption7d', '30d' => 'Consumption30d', '365d' => 'Consumption365d'] as $key => $ident) {
+            $result[$key] = is_array($ready) && ($ready[$key] ?? false) === true ? (float) $this->GetValue($ident) : null;
+        }
+        return $result;
+    }
+
+    /** Produce a responsive, dependency-free HTML tile from local Symcon variables. */
+    private function renderDashboard(array $periods): void
+    {
+        $timestamp = $this->ReadAttributeInteger('LastTimestamp');
+        $meter = $this->ReadAttributeFloat('LastValue');
+        $hasReading = $timestamp > 0 && $meter >= 0;
+        $displayMeter = $hasReading ? number_format($meter, 3, ',', '.') : '–';
+        $displayDate = $hasReading ? date('d.m.Y', $timestamp) : 'Noch keine Messung';
+        $displayClock = $hasReading ? date('H:i', $timestamp) . ' Uhr' : '';
+        $status = htmlspecialchars((string) $this->GetValue('State'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $rows = [
+            ['24h', 'Letzte 24 Stunden', false],
+            ['7d', 'Letzte 7 Tage', true],
+            ['30d', 'Letzte 30 Tage', true],
+            ['365d', 'Letzte 365 Tage', true],
+        ];
+        $tiles = '';
+        foreach ($rows as [$key, $label, $estimate]) {
+            $liters = $periods[$key] ?? null;
+            $figure = $liters !== null
+                ? ($estimate ? '≈ ' : '') . number_format((float) $liters, 1, ',', '.') . ' L'
+                : '—';
+            $explain = $liters !== null
+                ? ($estimate ? 'Näherung aus täglichen Zählerständen' : 'Zwei Messungen im Abstand von 18–30 h')
+                : 'Noch nicht genügend Messwerte';
+            $tiles .= '<div class="suru-stat"><span class="suru-label">' . $label . '</span><strong class="suru-figure">' . $figure .
+                '</strong><span class="suru-hint">' . $explain . '</span></div>';
+        }
+        $html = '<div class="suru-board"><style>
+.suru-board{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:inherit;box-sizing:border-box;padding:12px;line-height:1.35;min-width:0}
+.suru-board *{box-sizing:border-box}.suru-head{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:650;margin-bottom:12px}
+.suru-drop{display:inline-flex;align-items:center;justify-content:center;color:#fff;background:#087d9a;border-radius:11px;width:34px;height:34px;font-size:18px}
+.suru-hero{border-radius:16px;padding:17px 18px;background:linear-gradient(120deg,#0e708d,#083f68);color:white;margin-bottom:12px}
+.suru-kicker{font-size:12px;letter-spacing:.055em;text-transform:uppercase;opacity:.82;margin-bottom:5px}
+.suru-reading{font-size:clamp(27px,6vw,43px);letter-spacing:-.04em;line-height:1.15;font-weight:760;font-variant-numeric:tabular-nums}
+.suru-reading small{font-size:.43em;letter-spacing:normal;font-weight:550;opacity:.88;margin-left:4px}
+.suru-date{opacity:.88;font-size:12px;margin-top:8px}
+.suru-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.suru-stat{min-width:0;border:1px solid rgba(110,140,160,.27);border-radius:13px;padding:12px;background:rgba(102,139,159,.085);display:flex;flex-direction:column;gap:5px}
+.suru-label{font-size:12px;opacity:.78}.suru-figure{font-size:clamp(17px,4vw,26px);font-weight:730;letter-spacing:-.025em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.suru-hint{font-size:10px;opacity:.62;line-height:1.3}.suru-foot{margin-top:12px;font-size:11px;opacity:.76;line-height:1.5}
+.suru-status{font-weight:650}
+@media(max-width:380px){.suru-board{padding:8px}.suru-grid{gap:6px}.suru-stat{padding:9px}.suru-figure{font-size:18px}.suru-hint{font-size:9px}}
+</style><div class="suru-head"><span class="suru-drop">&#9679;</span> Wasserverbrauch</div><div class="suru-hero"><div class="suru-kicker">Letzter Zählerstand</div><div class="suru-reading">' .
+            $displayMeter . '<small>m³</small></div><div class="suru-date">Gemessen am ' . $displayDate . ' · ' . $displayClock .
+            '</div></div><div class="suru-grid">' . $tiles . '</div><div class="suru-foot"><span class="suru-status">' .
+            $status . '</span><div>Verbrauchszeiträume enden mit der letzten tatsächlichen Zählermessung, nicht mit dem Live-Zeitpunkt. Näherungen basieren auf maximal 18 h Grenzabweichung.</div></div></div>';
+        if ($this->GetValue('Dashboard') !== $html) {
+            $this->SetValue('Dashboard', $html);
+        }
     }
 }
