@@ -24,16 +24,19 @@ class IPSModuleStrict {
   protected function SetValue(string $a,mixed $b):void{$this->values[$a]=$b;}
   protected function GetValue(string $a):mixed{return $this->values[$a];}
   protected function GetIDForIdent(string $a):int{return crc32($a)&0x7fffffff;}
+  protected function UnregisterVariable(string $a):bool{$GLOBALS['legacyDashboard']=false;unset($this->values[$a]);return true;}
 }
 $GLOBALS['archiveEvents']=[];
 $GLOBALS['hiddenVars']=[];
 $GLOBALS['archiveAvailable']=true;
 $GLOBALS['archiveAggregation']=0;
 $GLOBALS['semaphoreLocked']=false;
+$GLOBALS['legacyDashboard']=false;
 function IPS_SemaphoreEnter(string $name,int $timeout):bool {if ($GLOBALS['semaphoreLocked']) return false; $GLOBALS['semaphoreLocked']=true;return true;}
 function IPS_SemaphoreLeave(string $name):void {$GLOBALS['semaphoreLocked']=false;}
 
 function IPS_SetHidden(int $var,bool $hidden):void{$GLOBALS['hiddenVars'][$var]=$hidden;}
+function IPS_GetObjectIDByIdent(string $ident,int $parent):int|false{return $ident==='Dashboard' && $GLOBALS['legacyDashboard'] ? 1234:false;}
 function IPS_GetInstanceListByModuleID(string $id):array{return [19];}
 function AC_GetLoggingStatus(int $id,int $var):bool{return !empty($GLOBALS['archived']);}
 function AC_GetAggregationType(int $id,int $var):int{return $GLOBALS['archiveAggregation'];}
@@ -62,7 +65,11 @@ class MockModule extends SuruWaterMonitor {
   protected function makeApi(): SuruApi {return $this->mock;}
 }
 function t(bool $v,string $msg):void{if(!$v)throw new Exception('FAIL '.$msg);echo "PASS $msg\n";}
-$m=new MockModule();$m->Create();$m->ApplyChanges();
+$m=new MockModule();$m->Create();
+t(!isset($m->values['Dashboard']), 'no HTML/dashboard variable on new install');
+$GLOBALS['legacyDashboard']=true; // Upgrade from the old 0.1.4 HTML variable
+$m->ApplyChanges();
+t($GLOBALS['legacyDashboard']===false, 'legacy HTML variable removed on upgrade');
 t(str_contains($m->values['Report'],'Cognito SRP: OK'),'offline crypto selftest');
 t($m->props['MeterSerial']==='','no personal serial exposed in public module');
 t($m->values['State']==='WARTE AUF WATERMONITOR BASIC KONTO','pending config state');
@@ -131,10 +138,9 @@ t($m->values['State']==='BETRIEBSBEREIT – BASIC','automatic recovery after tra
 $m->mock->returnedUnits=[['id'=>'another-unit']];
 $m->RequestAction('Poll',true);
 t($m->values['State']==='ZÄHLERZUORDNUNG GEÄNDERT','replacement meter blocked to preserve history');
-// Version upgrade never resets existing archive and exposes a native HTML tile.
+// Version upgrade never resets existing archive and retains numeric variables.
 $oldArchiveCount=count($GLOBALS['archiveEvents']);
-t(str_contains($m->values['Dashboard'],'Wasserverbrauch'),'dashboard HTML generated');
-t(str_contains($m->values['Dashboard'],'Zählerstand'),'dashboard includes latest meter title');
+t(!isset($m->values['Dashboard']), 'only native variables are generated');
 // Check daily time series using the existing archived counter without any extra API call.
 $GLOBALS['archiveEvents']=[];
 $m2=new MockModule();$m2->Create();$m2->props['Email']='me@example.org';$m2->props['Password']='fake';$m2->ApplyChanges();
@@ -147,12 +153,21 @@ t(abs($m2->values['Consumption7d']-35.0)<.001,'weekly consumption from archive')
 t(abs($m2->values['Consumption30d']-150.0)<.001,'30-day consumption from archive');
 t(abs($m2->values['Consumption365d']-1825.0)<.001,'365-day consumption from archive');
 t($GLOBALS['hiddenVars'][(crc32('Consumption365d')&0x7fffffff)]===false,'complete history exposes annual numeric variable');
-t(str_contains($m2->values['Dashboard'],'1.000,000'),'latest meter reading in HTML tile');
-t(str_contains($m2->values['Dashboard'],'Letzte 365 Tage'),'year period in HTML tile');
-// Missing historical samples must hide numeric variables, never present fictitious zero.
+t($m2->values['Meter']===1000.0,'latest meter is a native numeric variable');
+t($m2->values['MeasuredAt']===date('d.m.Y H:i:s',$today),'measurement date and time available as native string');
+// Manual hiding remains effective after later refresh or ApplyChanges.
+$hiddenID=crc32('Consumption365d')&0x7fffffff;
+IPS_SetHidden($hiddenID,true);
+$m2->ApplyChanges();
+t($GLOBALS['hiddenVars'][$hiddenID]===true,'manual visibility stays unchanged after refresh');
+// Missing historical samples start hidden; no automatic visibility overwrite during refresh.
 $GLOBALS['archiveEvents']=[];
 $m3=new MockModule();$m3->Create();$m3->props['Email']='me@example.org';$m3->props['Password']='fake';$m3->ApplyChanges();
 $m3->mock->r=['reading'=>12.345,'measuredAt'=>gmdate('c',$today)];$m3->RequestAction('Poll',true);
 t($GLOBALS['hiddenVars'][(crc32('Consumption7d')&0x7fffffff)]===true,'short history hides unavailable week');
-t(str_contains($m3->values['Dashboard'],'Noch nicht genügend Messwerte'),'unavailable values shown as pending');
+// User chooses which native variables to display, even when not enough history exists.
+$weeklyID=crc32('Consumption7d')&0x7fffffff;
+IPS_SetHidden($weeklyID,false);
+$m3->ApplyChanges();
+t($GLOBALS['hiddenVars'][$weeklyID]===false,'manual unhide is respected for unknown periods');
 echo "ALL MODULE TESTS PASSED\n";
