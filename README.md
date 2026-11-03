@@ -2,21 +2,28 @@
 
 Inoffizielles, **rein lesendes** IP-Symcon-Modul zur Auswertung eines SURU-/WaterMonitor-Kontos. Entwickelt mit Fokus auf das **kostenlose BASIC-Konto** und die SymBox. Kein Home Assistant, keine zusätzliche Hardware, keine kostenpflichtigen SURU-Funktionen.
 
-## Stand v0.1.4: Rollierende Verbräuche + Visualisierungs-Kachel
+## Stand v0.1.5: Ausschließlich normale Symcon-Variablen
 
-**Erfolgreich live verifiziert:** SURU BASIC Login und Gesamtzählerstand am 03.11.2026 anhand der vom Nutzer übermittelten Symcon-LIVE-Diagnose. Fortlaufende historische Messwerte sind noch nicht belegt.
+**Kein HTML, keine Webinhalt-Variable und keine externe Webansicht.**
 
-Neu erzeugt die Modulinstanz direkt folgende **vier Float-Variablen in Litern**:
-- `Consumption24h`: Verbrauch zwischen zwei Messungen in 18–30 Stunden Abstand (etwa letzte 24 h).
-- `Consumption7d`: Verbrauch der letzten 7 × 24 Stunden.
-- `Consumption30d`: Verbrauch der letzten 30 × 24 Stunden.
-- `Consumption365d`: Verbrauch der letzten 365 × 24 Stunden.
+Die gewünschte Darstellung erfolgt ausschließlich durch das gezielte Ein-/Ausblenden der normalen Statusvariablen in der Standard-Visualisierung / WebFront. Der alte HTML-Ausgang `Dashboard` aus v0.1.4 wird beim Modul-Update in `ApplyChanges()` über `UnregisterVariable` entfernt (nur wenn er existiert). Bestehende Zugangsdaten, Zählerstände, Messzeitpunkte, Archive und GUIDs bleiben unverändert.
 
-Die Zeitfenster enden beim **letzten tatsächlichen Messzeitpunkt** des Zählers, nicht beim Zeitpunkt des Cloud-Abrufs. Für 7/30/365 Tage wird ein gespeicherter Zählerstand im Zeitfenster ±18 Stunden um die Zielgrenze gewählt; das Ergebnis ist deshalb als **≈ Näherung** gekennzeichnet. Es findet keine künstliche Hochrechnung bei fehlender Datenhistorie statt. Fehlt ein geeigneter Zählerstand, wird die Variable in der Objektansicht ausgeblendet und in der Kachel `— / Noch nicht genügend Messwerte` angezeigt. Ein gemessener Nullverbrauch ist dagegen 0 Liter.
+Für die Visualisierung sind besonders geeignet:
 
-**Kachel-Visualisierung und Standard-WebFront:** Die Modulinstanz erstellt die String-Variable `Dashboard` (`Wasserverbrauch – Übersicht`) mit Symcon-Darstellung *Webinhalt / HTML*. Als eigene Kachel in der Visualisierung anzeigen. Der Großwert zeigt m³ und den Messzeitpunkt; darunter stehen die vier Verbrauchszeiträume. Der Inhalt wird bei jeder neu angenommenen Messung und bei Fehlerstatus aktualisiert, ohne externe Skripte oder Internet-CDNs.
+- `Meter` (Float) – letzter Gesamtzählerstand in m³
+- `MeasuredAt` (String) – Datum und Uhrzeit der tatsächlichen letzten Zählermessung
+- `Consumption24h` (Float) – Verbrauch zwischen zwei Messungen in 18–30 Stunden Abstand
+- `Consumption7d` (Float) – circa letzte 7 Tage
+- `Consumption30d` (Float) – circa letzte 30 Tage
+- `Consumption365d` (Float) – circa letzte 365 Tage
 
-**Updatesicherheit:** Vorhandene Variablen-Idents, GUIDs und Archivwerte aus v0.1.3 werden übernommen. In `ApplyChanges` wird nur die bestehende Historie ausgewertet; es erfolgt dort kein Cloud-Aufruf. Die bisherigen Variablen `Delta` (seit letzter Messung) und `Month` (seit erster Messung im laufenden Monat) bleiben unverändert.
+Optional bleiben `Delta` (Liter seit letzter Messung) und `Month` (Liter seit erster Messung im aktuellen Monat) sowie Diagnose/Status verfügbar.
+
+**Messgenauigkeit:** Alle Fenster enden mit dem letzten tatsächlichen Messzeitpunkt, nicht mit dem Cloud-Abruf. Für 7/30/365 Tage gilt eine Toleranz von ±18 Stunden am ältesten Vergleichspunkt; die Werte sind daher Näherungen aus Tagesablesungen. Der Wert 24h wird nur bei 18–30 Stunden Messabstand berechnet. Keine Hochrechnung ohne Daten.
+
+**Datenverfügbarkeit:** Ein erstmals angelegter Zeitraum wird bis zur ersten gültigen Berechnung in der Objektansicht verborgen und danach genau einmal automatisch eingeblendet. Ab dann werden manuelle Sichtbarkeitseinstellungen ausdrücklich respektiert, auch bei Modulupdates und weiteren Abfragen. Bereits vom Benutzer ausgeblendete, zuvor berechnete Zeiträume bleiben ausgeblendet. Bei fehlender Historie wird kein neuer Nullwert geschrieben. Die Objektvariable kann technisch jedoch den Startwert 0 zeigen, falls man sie vor der ersten gültigen Messung manuell sichtbar macht; ob der Wert bereits berechnet werden konnte, ist im internen `PeriodReadiness`-Status hinterlegt.
+
+**Historie:** Das vorhandene Symcon-Archiv (`History`) bleibt unverändert und wird nur mit bestätigten echten Zählerständen erweitert. Keine kostenpflichtigen BASIC-Endpunkte.
 
 ## Wichtiger Status
 
@@ -78,7 +85,7 @@ Basiert in der Protokollbeschreibung auf dem MIT-lizenzierten Projekt [teuffel/h
 - Das kostenlose Konto muss vom Betreiber verifiziert und einem Zähler zugeordnet sein.
 - Wenn SURU nur einmal täglich neue Messwerte liefert, kann das Modul trotz stündlicher Abfrage nicht mehr Messpunkte erzeugen.
 - API-Felder und Rollen können sich jederzeit ändern.
-- Stand v0.1.4: Anmeldung und erster Zählerwert wurden mit v0.1.3 live bestätigt. Der neue rollierende Verlauf und die HTML-Kachel sind offline simuliert und müssen in der Visualisierung überprüft werden.
+- Stand v0.1.5: Live-Anmeldung mit v0.1.3 bestätigt, rollierende Zeitfenster offline getestet; die Standard-Symcon-Variablen müssen nach dem Update in der Visualisierung kontrolliert werden.
 
 ## SymBox-/PHP-Architektur
 
@@ -103,3 +110,10 @@ Die mitgelieferte Montgomery-BigInteger-Routine verwendet auf PHP mit 64-Bit-Int
 - Rechenwerte und responsive Symcon-Webinhalt-Kachel (keine Cloud-Erweiterung, unveränderter BASIC-API-Zugriff).
 - Die neue HTML-Kachel enthält nur aggregierte Verbräuche und nie Anmeldedaten.
 - Testlauf: `php tests/consumption_tests.php`, `php tests/module_smoke.php`, `php tests/unit_tests.php`, `php tests/api_protocol.php`.
+
+## Nachprüfung v0.1.5
+
+- Reine Statusvariablen statt Webinhalt-Kachel. Keine HTML/CSS-/Web-Rendering-Routine mehr.
+- Altes `Dashboard` wird beim Aktualisieren der Instanz sicher deregistriert; das Messwertarchiv bleibt bestehen.
+- Manuelle Sichtbarkeit der Verbrauchsvariablen wird nach der erstmaligen Datenverfügbarkeit nicht mehr durch regelmäßige Abfragen zurückgesetzt.
+- Bestehende Zählernummer, Credentials, Modul-GUIDs und Variablen-Idents unverändert.
