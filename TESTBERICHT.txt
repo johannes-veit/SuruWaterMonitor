@@ -1,26 +1,6 @@
-SURU WaterMonitor BASIC / IP-Symcon 9.0 – Prüfbericht 0.1.3
-Stand: 03.11.2026
-
-Codebasis: bisheriges SuruWaterMonitor v0.1.1, kompatible Weiterentwicklung.
-Prüfumgebung: PHP CLI 8.4, simuliertes IPSModuleStrict und Archiv.
-
-Bestanden (Offline):
-- PHP Syntaxprüfung aller Modul-, Bibliotheks- und Testdateien.
-- JSON-Gültigkeit von library.json, module.json und form.json.
-- Cognito SRP Public-Key, Passwortchallenge-Signatur und UTC-Zeitstempel.
-- Simulierter Login, Geräteauflistung, Reading-Abruf, Token-Erneuerung bei 401.
-- Nichtaufruf kostenpflichtiger Verbrauchsendpunkte.
-- Erster Abruf, doppelte Meldung, Änderungsdelta, abgelehnter Rücksprung.
-- Erneute Speicherung nach vorübergehendem Archivfehler.
-- Sperre gegen parallele Polls und Konto-/Zählerverwechslung.
-- Netzwerkfehler, API 403/429, temporäre Störung und Wiederanlauf.
-- Konfigurationsformular und Status-/Diagnoseausgabe.
-
-Noch OFFEN (nicht offline beweisbar):
-- Echtes SRP-Login mit WaterMonitor-BASIC-Zugang des Nutzers.
-- API-Berechtigungen und tatsächliches JSON der freigeschalteten Zähler-ID.
-- Echte SymBox/IP-Symcon-9.0-Installation und 24h-Dauerbetrieb.
-
-Keine Garantie für die Stabilität einer inoffiziellen Cloud-Schnittstelle.
-
-Nachprüfung 0.1.3: Archivkonfiguration bei Aggregationstypwechsel korrigiert; persönliche Zählernummer entfernt.
+SURU WaterMonitor 0.1.5 – Testbefehle
+php tests/unit_tests.php
+php tests/consumption_tests.php
+php tests/api_protocol.php
+php tests/module_smoke.php
+Erwartung: Alle Simulationen erfolgreich. Kein Live-Credential-Test im Paket.
