@@ -170,4 +170,24 @@ $weeklyID=crc32('Consumption7d')&0x7fffffff;
 IPS_SetHidden($weeklyID,false);
 $m3->ApplyChanges();
 t($GLOBALS['hiddenVars'][$weeklyID]===false,'manual unhide is respected for unknown periods');
+// End-to-end: test an incorrect archive startup zero and a 10-day history.
+$GLOBALS['archiveEvents']=[];
+$m4=new MockModule();$m4->Create();
+$m4->props['Email']='me@example.org';$m4->props['Password']='fake';$m4->ApplyChanges();
+for($d=1;$d<=10;$d++) {
+  $GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-$d*86400,'Value'=>17.200-$d*.05];
+}
+$GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-86400+6*3600,'Value'=>0.0];
+$m4->mock->r=['reading'=>17.200,'measuredAt'=>gmdate('c',$today)];
+$m4->RequestAction('Poll',true);
+t(abs($m4->values['Consumption24h']-50.0)<.001,'daily value excludes false 0 in archive');
+t(abs($m4->values['Consumption7d']-350.0)<.001,'7d correctly includes seven available days');
+t(abs($m4->values['Consumption30d']-500.0)<.001,'30d includes all ten days');
+t(abs($m4->values['Consumption365d']-500.0)<.001,'365d includes all ten days');
+$m4->values['Consumption24h']=17200.0;
+$m4->values['Consumption30d']=0.0;
+$before=count($GLOBALS['archiveEvents']);
+$m4->ApplyChanges();
+t(abs($m4->values['Consumption24h']-50.0)<.001 && abs($m4->values['Consumption30d']-500.0)<.001,'module update repairs existing bad values');
+t(count($GLOBALS['archiveEvents'])===$before,'archive untouched after re-computation');
 echo "ALL MODULE TESTS PASSED\n";
