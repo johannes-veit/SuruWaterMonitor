@@ -1,3 +1,11 @@
+## 0.1.6 (2026-11-04)
+
+- Verhindert, dass ein Archiv-Nullwert den 24h-Verbrauch zum Gesamtzählerstand werden lässt.
+- Summiert echte tägliche Differenzen; 7, 30 und 365 Tage zeigen bereits bei kurzer Historie sinnvolle Teilsummen.
+- Keine Hochrechnung bei fehlenden Tagesintervallen; Nullverbrauch wird korrekt berücksichtigt.
+- Historische Werte werden beim Modulupdate erneut berechnet, ohne das Archiv zu verändern.
+- Zusätzliche Tests: 10 Tageswerte, Nullwert-Ausreißer, Archiv-Neuberechnung und Datenlücken.
+
 ## 0.1.5 (2026-11-03)
 
 - Die HTML-/Webinhalt-Kachel `Dashboard` wird nicht mehr erstellt; ältere Dashboard-Variable wird bei `ApplyChanges()` deregistriert.
