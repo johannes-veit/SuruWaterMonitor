@@ -7,7 +7,7 @@ require_once __DIR__ . '/../libs/Consumption.php';
 /** Unofficial read-only SURU BASIC connection for IP-Symcon >= 8.1. */
 class SuruWaterMonitor extends IPSModuleStrict
 {
-    private const VERSION = '0.1.5';
+    private const VERSION = '0.1.6';
     private const ARCHIVE_MODULE = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
 
     public function Create(): void
@@ -372,7 +372,7 @@ class SuruWaterMonitor extends IPSModuleStrict
                 $archives = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE);
                 if ($archives) {
                     // Daily samples require only ~370 rows, and nothing is backdated.
-                    $from = $lastTime - 365 * 86400 - 18 * 3600;
+                    $from = $lastTime - 365 * 86400 - 30 * 3600;
                     $history = AC_GetLoggedValues((int) $archives[0], $this->GetIDForIdent('History'), $from, $lastTime, 0);
                     if (is_array($history)) {
                         $periods = SuruConsumption::calculate($history, $lastTime, $lastValue);
