@@ -1,3 +1,16 @@
+## Stand v0.1.6 – Korrektur der Verbrauchsberechnung (04.11.2026)
+
+**Nur normale Symcon-Variablen.** Die bisherige 24-h-Berechnung konnte einen automatisch protokollierten Nullwert als echten Zählerstand interpretieren. Jetzt werden ausschließlich plausible tägliche Differenzen zwischen gültigen aufeinanderfolgenden Zählerständen addiert.
+
+- **24 Stunden:** Differenz der letzten beiden gültigen Messungen im Abstand von 18–30 Stunden, in Litern. Niemals der gesamte m³-Zählerstand.
+- **7 Tage:** Summe der verfügbaren Tagesdifferenzen innerhalb der letzten sieben Tage.
+- **30 und 365 Tage:** ebenfalls Summen der bereits verfügbaren Tagesdifferenzen; bei kürzerer Historie bewusst Teilsummen (z. B. 10 vorhandene Tage).
+- **Fehlende Tage:** keine Hochrechnung, keine künstlichen Nulltage. Echte Tage ohne Verbrauch ergeben 0 L.
+- **Archivschutz:** widersprüchliche Null-/Rücksprungwerte werden für die Berechnung verworfen; der bestehende Archivinhalt wird nicht verändert.
+- **Update:** dieselbe Modulinstanz aktualisieren und einmal **Übernehmen** drücken. Bereits gespeicherte fehlerhafte Variablenwerte werden aus der Historie neu berechnet. Zugangsdaten und Zählerregistrierung bleiben unverändert.
+
+---
+
 # SURU WaterMonitor BASIC – IP-Symcon 9.0
 
 Inoffizielles, **rein lesendes** IP-Symcon-Modul zur Auswertung eines SURU-/WaterMonitor-Kontos. Entwickelt mit Fokus auf das **kostenlose BASIC-Konto** und die SymBox. Kein Home Assistant, keine zusätzliche Hardware, keine kostenpflichtigen SURU-Funktionen.
