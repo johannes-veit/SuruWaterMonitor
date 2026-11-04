@@ -1,3 +1,15 @@
+UPDATE AUF SURUWATERMONITOR 0.1.6 – 04.11.2026
+
+1. IP-Symcon → Kern-Instanzen → Modules → SuruWaterMonitor → Aktualisieren.
+2. Bestehende Instanz öffnen und „Übernehmen“ wählen.
+3. Die vier normalen Float-Variablen Verbrauch 24h / 7d / 30d / 365d prüfen.
+4. Keine Neuinstallation, keine neue Cloud-Anmeldung, keine Änderung an der Visualisierung erforderlich.
+5. Bei noch kurzer Historie zeigen 30 und 365 Tage die Summe der bisher verfügbaren Tage.
+
+Die vorhandenen archivierten Zählerstände werden nicht verändert.
+
+--- 
+
 SURU WATERMONITOR – UPDATE v0.1.5 (NATIVE VARIABLEN)
 
 1. IP-Symcon -> Kern-Instanzen -> Modules -> SuruWaterMonitor aktualisieren.
