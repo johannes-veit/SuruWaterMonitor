@@ -1,3 +1,12 @@
+## 0.1.8 (2026-11-06)
+
+- Grenzfall korrigiert: Einbauverbrauch faellt bei 30/365 Tagen beim Fensterwechsel nicht abrupt als Gesamtsumme weg, sondern nimmt im unbekannten Intervall 27.10.–03.11. anteilig ab (explizit als Schaetzung markiert).
+- Komplett neue rollierende Grenzwertberechnung aus geprueften kumulativen echten Wasserzaehlerstaenden; Datenluecken nicht als Nullverbrauch behandelt.
+- Startwert niemals als pauschaler Zuschlag; automatische vollstaendige Ausblendung des Startanteils, sobald die erste Cloud-Messung hinter der Fenstergrenze liegt.
+- 24h und beobachtete 7-Tage-Teilsumme bleiben unveraendert. Verbesserter Schutz gegen falsche Null-/Ausreisser-Eintraege.
+- Rechenbasis je Zeitraum in der LIVE-Diagnose sichtbar; keine zusaetzlichen sichtbaren Variablen.
+- Tests fuer 30/365-Tage-Uebergang, falsche Archivwerte, veraenderte Messtermine, fehlende Tage, 24h und ohne Einbaustand.
+
 ## 0.1.7 (2026-11-06)
 
 - Optionaler per-Instanz-Einbaustand (`UseInstallReading`, `InstallDate`, `InstallReadingM3`), standardmaessig deaktiviert.
