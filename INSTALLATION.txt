@@ -1,3 +1,22 @@
+UPDATE v0.1.10 – KEIN SKRIPT ERFORDERLICH
+
+Fuer den bereits dokumentierten Wasserzaehler (bestehende Instanz #35654)
+uebernimmt das Modul bei der naechsten Modul-Aktualisierung die
+Einbaukorrektur automatisch. Voraussetzung: die archivierten Ablesungen
+vom 03.11.2026 um 14:25 (1,715 m3) und 04.11.2026 um 14:25 (1,853 m3)
+sind noch vorhanden. Danach werden automatisch gespeichert:
+- Einbaustand beruecksichtigen: JA
+- Einbaudatum: 2026-10-27
+- Stand beim Einbau: 0,000 m3
+
+Kein Skript, keine neue Instanz, kein manuelles Uebernehmen.
+Die Anwendung erfolgt automatisch ueber einen Symcon-internen Modultimer.
+30/365 Tage: bei Stand 1,949 m3 des 05.11.2026 jeweils 1.949 Liter;
+24h: 96 Liter, 7 Tage: 234 Liter. Keine dauerhafte Addierung.
+Bei fehlenden Alt-Messwerten wird die Auto-Aktivierung aus Sicherheit
+nicht geraten, sondern beim naechsten erfolgreichen Abruf erneut geprueft.
+In der Diagnose erscheint der Ergebnisstatus.
+
 SURU WATERMONITOR BASIC – UPDATE AUF 0.1.6 (04.11.2026)
 
 1. In IP-Symcon unter Kern-Instanzen -> Modules die vorhandene Library SuruWaterMonitor aktualisieren.
