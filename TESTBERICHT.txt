@@ -1,7 +1,11 @@
-SURU WaterMonitor v0.1.9 – lokale Qualitaetspruefung, 06.11.2026
-
-- Tests fuer Tageswert aus zwei echten Cloud-Messungen und Wiederanlauf.
-- 270 deterministische Messabstandsfaelle, einschliesslich 23/25h und 48/72h.
-- Archiv-Nullwert, doppelte Cloud-Abrufe, manuelle Sichtbarkeit,
-  Archivstoerung und Einbaustand-Regression geprueft.
-- Kein Live-Test mit echtem Benutzerkonto aus der lokalen Umgebung moeglich.
+SURU WaterMonitor v0.1.10 – Testergebnis (lokale PHP-Simulation)
+- PHP 8.4 Syntaxpruefung aller PHP-Dateien: OK
+- Berechnung aller Fenster inklusive 270 Messabstands-Grenzfaelle: OK
+- Kryptografische und Messwert-Unit-Tests: OK
+- API-Mock-Protokoll (BASIC ohne Premium): OK
+- Symcon-Modultest: OK
+- Einmaliges Anwenden des Installationstandes ueber nativen Modultimer: OK
+- Exakt passende Alt-Zaehlermessungen erforderlich, sonst keine Veraenderung: OK
+- 24h/7d bleiben, 30d/365d steigen von 234 auf 1949: OK
+- Idempotenz, manuelle Instanzeinstellungen, keine Archivveraenderung: OK
+- LIVE auf SymBox: nach Installation von v0.1.10 noch NICHT bestaetigt.
