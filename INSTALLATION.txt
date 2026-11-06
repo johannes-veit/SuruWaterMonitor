@@ -26,3 +26,13 @@ UPDATE 0.1.8: VERRECHNUNGSOPTIMIERUNG
   betroffenen Zeitfenster; bei Grenzuebergang anteilige Schaetzung.
 - Der Startanteil verschwindet automatisch nach dem 03.12.2026
   (30d) und nach dem 03.11.2027 (365d). Keine Archivaenderung.
+
+UPDATE 0.1.9 (Tageswerte absichern):
+1. Bestehendes Modul ueber GitHub auf 0.1.9 aktualisieren.
+2. Bestehende Instanz oeffnen und Uebernehmen ausfuehren.
+3. Vorherige Zugangsdaten und Einbaustand 2026-10-27, 0.000 m3 bleiben erhalten.
+4. Tageswert nutzt die zwei neuesten echten Cloud-Ablesungen (18-30h Abstand).
+5. Nach einer ausgelassenen Tagesablesung wird der veraltete 24h-Wert
+   voruebergehend ausgeblendet; Delta bleibt als Verbrauch seit letzter Messung.
+6. Bei der naechsten gueltigen Tagesablesung wird der Tageswert wieder sichtbar,
+   es sei denn, er war vom Benutzer schon vorher manuell verborgen.
