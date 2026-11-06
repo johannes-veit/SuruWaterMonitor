@@ -1,40 +1,28 @@
-UPDATE AUF SURUWATERMONITOR 0.1.6 – 04.11.2026
+SURU WATERMONITOR BASIC – UPDATE AUF 0.1.6 (04.11.2026)
 
-1. IP-Symcon → Kern-Instanzen → Modules → SuruWaterMonitor → Aktualisieren.
-2. Bestehende Instanz öffnen und „Übernehmen“ wählen.
-3. Die vier normalen Float-Variablen Verbrauch 24h / 7d / 30d / 365d prüfen.
-4. Keine Neuinstallation, keine neue Cloud-Anmeldung, keine Änderung an der Visualisierung erforderlich.
-5. Bei noch kurzer Historie zeigen 30 und 365 Tage die Summe der bisher verfügbaren Tage.
+1. In IP-Symcon unter Kern-Instanzen -> Modules die vorhandene Library SuruWaterMonitor aktualisieren.
+2. Die bestehende SuruWaterMonitor-Instanz öffnen und auf Übernehmen klicken.
+3. Die nativen Float-Variablen Verbrauch 24h / 7d / 30d / 365d prüfen.
+4. Ab einer einzigen vollständigen Tagesdifferenz werden alle vier Werte angezeigt bzw. berechnet.
+5. Die Werte 30d und 365d sind bis zum Ablauf der vollen Historie die Summe der bislang verfügbaren Tageswerte.
 
-Die vorhandenen archivierten Zählerstände werden nicht verändert.
+Kein neues Konto, keine Neuvalidierung, keine Passwortänderung, keine neue Instanz und keine neue Visualisierung.
+Die Datenbank-Archivwerte werden weder gelöscht noch verändert. Der Modultest bleibt in der Variable Selbsttest / Diagnose.
+Bei unbekanntem Verbrauchszeitraum ist der echte Wert nicht 0; er wird erst nach einem verwertbaren Tagesintervall angezeigt.
 
---- 
+UPDATE AUF 0.1.7:
+1. Bestehendes GitHub-Modul aktualisieren, Instanz oeffnen.
+2. Unter Optionale Einstellungen das Kontrollkaestchen fuer den bekannten Einbaustand aktivieren.
+3. Einbaudatum YYYY-MM-DD (bei ungefaehrem Datum Vorsicht nahe Zeitfenstergrenze) und 0.000 m3 eintragen.
+4. Uebernehmen. Die 30/365 Tage werden sofort ohne zusaetzlichen Cloud-Abruf neu berechnet.
+5. 24h und 7d bleiben auf den realen Tagesdifferenzen.
 
-SURU WATERMONITOR – UPDATE v0.1.5 (NATIVE VARIABLEN)
-
-1. IP-Symcon -> Kern-Instanzen -> Modules -> SuruWaterMonitor aktualisieren.
-2. Die bestehende Instanz öffnen und "Übernehmen" drücken.
-3. In der Standard-Visualisierung nur die gewünschten Variablen anzeigen:
-   - Zählerstand (m³) [Meter]
-   - Messzeitpunkt [MeasuredAt]
-   - Verbrauch letzte 24 Stunden [Consumption24h]
-   - Verbrauch letzte 7 Tage [Consumption7d]
-   - Verbrauch letzte 30 Tage [Consumption30d]
-   - Verbrauch letzte 365 Tage [Consumption365d]
-4. Das nicht mehr benötigte Dashboard aus v0.1.4 wird automatisch entfernt.
-5. Zugangsdaten, Archive und Zählerwerte bleiben erhalten.
-
-Anfangs fehlen historische Messdaten für längere Zeiträume; diese Variablen werden
-bei ausreichend Archivwerten einmalig eingeblendet. Danach bleibt eine
-manuelle Ausblendung erhalten. Vor der ersten gültigen Berechnung kann
-eine manuell eingeblendete Float-Variable technisch den Startwert 0 zeigen.
-
-Nur Lesen, WaterMonitor BASIC. Kein Home Assistant, keine Webinhalt-Kachel.
-UPDATE 0.1.7: INSTALLATIONS-NULLSTAND
-1. Nur die bestehende Symcon-Instanz oeffnen (kein neuer Zaehler).
-2. Unter Optionale Einstellungen Startstand beruecksichtigen aktivieren.
-3. Einbaudatum JJJJ-MM-TT, beim dokumentierten Zaehler genau 2026-10-27.
-4. Einbaustand 0,000 m3 eintragen und Uebernehmen.
-5. Letzte 30/365 Tage beruecksichtigen dann alle 1.949 Liter seit Einbau,
-   letzte 7 Tage 234 Liter und 24 Stunden 96 Liter (Messung 05.11.2026).
-6. Keine historischen Daten werden ins Archiv zurueckgeschrieben.
+UPDATE 0.1.8: VERRECHNUNGSOPTIMIERUNG
+- Die eingerichtete Instanz weiterverwenden, Modulverwaltung aktualisieren,
+  in der Instanz Uebernehmen klicken.
+- Einbaudatum 2026-10-27, Einbaustand 0.000 m3, Option aktiviert.
+- 24h/7d bleiben reine Messwerte/Teilsummen.
+- 30d/365d erhalten fehlende Verbrauchsanteile nur innerhalb der
+  betroffenen Zeitfenster; bei Grenzuebergang anteilige Schaetzung.
+- Der Startanteil verschwindet automatisch nach dem 03.12.2026
+  (30d) und nach dem 03.11.2027 (365d). Keine Archivaenderung.
