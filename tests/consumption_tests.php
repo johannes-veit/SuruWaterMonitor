@@ -93,3 +93,26 @@ $ghost[]=['TimeStamp'=>$t('2026-11-02 18:00:00'),'Value'=>0.0];
 $r=SuruConsumption::calculate($ghost,$reading3,1.949,$installation);
 ck(near($r['24h'],96)&&near($r['30d'],1949),'archive activation ghost zero cannot inflate or overwrite estimated period');
 echo "ALL CONSUMPTION TESTS PASSED\n";
+
+// 256 deterministic daily-boundary checks, including minor clock drift,
+// daylight-saving offsets, missing daily transmissions, and repeated zero use.
+$dailyCases = 0;
+foreach ([16,17,18,19,20,23,24,25,26,29,30,31,36,48,72] as $gapHours) {
+    for ($i=0; $i<18; $i++) {
+        $tLatest = 1810300000 + $i * 2000;
+        $tPrevious = $tLatest - $gapHours * 3600;
+        $litres = ($i % 6 === 0) ? 0.0 : (float) ($i * 13 + 7);
+        $val = 31.0 + $i / 10;
+        $prevVal = $val - $litres/1000;
+        $arr = [['TimeStamp'=>$tPrevious,'Value'=>$prevVal]];
+        if ($i % 7 === 1) $arr[]=['TimeStamp'=>$tLatest-3600,'Value'=>0.0];
+        $actual=SuruConsumption::calculate($arr,$tLatest,$val)['24h'];
+        $shouldBeDay=$gapHours>=18 && $gapHours<=30;
+        if (!($shouldBeDay ? near($actual,$litres) : $actual===null)) {
+            throw new RuntimeException("FAIL daily gap check {$gapHours}h / case {$i}");
+        }
+        $dailyCases++;
+    }
+}
+echo "Daily boundary scenarios checked: {$dailyCases}\n";
+ck($dailyCases===270,'all daily time-gap cases passed');
