@@ -81,7 +81,7 @@ final class SuruConsumption
             $gap = $latestTime - $previousTime;
             if ($gap >= self::MIN_DAILY_GAP && $gap <= self::MAX_DAILY_GAP) {
                 $values['24h'] = self::litres($latestValue - $verified[$previousTime]);
-                $basis['24h'] = 'letzte echte Tagesdifferenz';
+                $basis['24h'] = sprintf('letzte echte Tagesdifferenz, Messabstand %.2f h', $gap / 3600);
             }
 
             foreach (['7d' => 7, '30d' => 30, '365d' => 365] as $key => $days) {
