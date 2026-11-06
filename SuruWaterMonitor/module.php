@@ -7,7 +7,7 @@ require_once __DIR__ . '/../libs/Consumption.php';
 /** Unofficial read-only SURU BASIC connection for IP-Symcon >= 8.1. */
 class SuruWaterMonitor extends IPSModuleStrict
 {
-    private const VERSION = '0.1.8';
+    private const VERSION = '0.1.9';
     private const ARCHIVE_MODULE = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
 
     public function Create(): void
@@ -37,6 +37,8 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->RegisterAttributeString('PeriodReadiness', '{}');
         $this->RegisterAttributeString('PeriodEverReady', '{}'); // one-time unhide; manual visibility is respected
         $this->RegisterAttributeString('ConsumptionBasis', '{}'); // computation provenance for diagnostics
+        $this->RegisterAttributeString('PreviousReading', ''); // prior accepted cloud snapshot for reliable day delta
+        $this->RegisterAttributeString('PeriodAutoHidden', '{}'); // temporarily hidden invalid values, restore only when valid
         $this->RegisterTimer('Poll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('FirstPoll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('Retry', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
@@ -291,6 +293,15 @@ class SuruWaterMonitor extends IPSModuleStrict
                     $this->setIssue('ARCHIV NICHT BEREIT', 'Messung empfangen, Archivspeicherung wird erneut versucht', 10);
                     return;
                 }
+                // Preserve the actual previous accepted cloud reading. This is independent
+                // of archive availability, out-of-order rows and archive activation zero.
+                if ($kind === 'new' && $old >= 0 && $lastTime > 0) {
+                    $this->WriteAttributeString('PreviousReading', json_encode([
+                        'timestamp' => $lastTime, 'value' => $old
+                    ], JSON_THROW_ON_ERROR));
+                } else {
+                    $this->WriteAttributeString('PreviousReading', '');
+                }
                 $this->SetValue('Meter', $parsed['value']);
                 $this->SetValue('Delta', $evaluation['delta_l']);
                 $this->SetValue('MeasuredAt', date('d.m.Y H:i:s', $parsed['timestamp']));
@@ -430,11 +441,38 @@ class SuruWaterMonitor extends IPSModuleStrict
             $details = SuruConsumption::calculateDetailed($history, $lastTime, $lastValue, $opening);
             $periods = $details['values'];
             $sources = $details['basis'];
+            // The daily value must come from two consecutive, accepted API
+            // snapshots whenever available, not from potentially bad archive rows.
+            $previousReading = json_decode($this->ReadAttributeString('PreviousReading'), true);
+            $directDaily = false;
+            if (is_array($previousReading) && isset($previousReading['timestamp'], $previousReading['value']) &&
+                is_numeric($previousReading['timestamp']) && is_numeric($previousReading['value'])) {
+                $priorTime = (int) $previousReading['timestamp'];
+                $priorValue = (float) $previousReading['value'];
+                $gap = $lastTime - $priorTime;
+                if ($priorTime > 0 && $gap > 0 && is_finite($priorValue) && $priorValue >= 0 &&
+                    $priorValue <= $lastValue + 0.0005) {
+                    $delta = $lastValue - $priorValue;
+                    $delta = max(0.0, $delta);
+                    $plausible = $delta <= max(0.01, $gap * 10 / 3600);
+                    if ($gap >= 18 * 3600 && $gap <= 30 * 3600 && $plausible) {
+                        $periods['24h'] = round($delta * 1000, 3);
+                        $sources['24h'] = sprintf('direkte Cloud-Differenz, Messabstand %.2f h', $gap / 3600);
+                        $directDaily = true;
+                    } else {
+                        // Missing day: total difference spans more/less than one day.
+                        // Never display the prior daily consumption as if it were new.
+                        $periods['24h'] = null;
+                        $sources['24h'] = sprintf('kein neuer Tageswert, Messabstand %.2f h', $gap / 3600);
+                    }
+                }
+            }
             if (!$archiveOk) {
                 // Known total since installation is exact while installation
                 // lies inside the window. No interpolation without history.
                 foreach (['24h', '7d', '30d', '365d'] as $span) {
                     $days = ['24h'=>1, '7d'=>7, '30d'=>30, '365d'=>365][$span];
+                    if ($span === '24h' && $directDaily) continue;
                     if ($opening === null || $span === '24h' || $span === '7d' ||
                         $opening['timestamp'] > $lastTime - $days * 86400 ||
                         $opening['value'] > $lastValue) {
@@ -450,22 +488,37 @@ class SuruWaterMonitor extends IPSModuleStrict
         $previous = is_array($previous) ? $previous : [];
         $everReady = json_decode($this->ReadAttributeString('PeriodEverReady'), true);
         $everReady = is_array($everReady) ? $everReady : [];
+        $autoHidden = json_decode($this->ReadAttributeString('PeriodAutoHidden'), true);
+        $autoHidden = is_array($autoHidden) ? $autoHidden : [];
         foreach ($idents as $key => $ident) {
             $liters = $periods[$key];
+            $variable = $this->GetIDForIdent($ident);
+            $object = IPS_GetObject($variable);
+            $hidden = (bool) ($object['ObjectIsHidden'] ?? false);
             if ($liters === null) {
-                // The value remains untouched; do not write a misleading zero or change visibility.
+                // Preserve old numeric reading internally, but do not expose it
+                // in the tile as a current 24h / rolling value after a data gap.
+                if (!$hidden) {
+                    IPS_SetHidden($variable, true);
+                    $autoHidden[$key] = true;
+                }
                 continue;
             }
             if (abs((float) $this->GetValue($ident) - $liters) > 0.0001) {
                 $this->SetValue($ident, $liters);
             }
-            // Show a period exactly once when enough data first becomes available.
-            // Values already available in v0.1.4 are not unhidden: user choices prevail.
-            if (empty($everReady[$key]) && empty($previous[$key])) {
-                IPS_SetHidden($this->GetIDForIdent($ident), false);
+            if (!empty($autoHidden[$key])) {
+                // Restore a previously visible value only if we hid it.
+                IPS_SetHidden($variable, false);
+                unset($autoHidden[$key]);
+            } elseif (empty($everReady[$key]) && empty($previous[$key])) {
+                IPS_SetHidden($variable, false);
             }
+            // A variable explicitly hidden by the user (without autoHidden)
+            // is never re-enabled on refresh or a future module update.
             $everReady[$key] = true;
         }
+        $this->WriteAttributeString('PeriodAutoHidden', json_encode($autoHidden, JSON_THROW_ON_ERROR));
         $this->WriteAttributeString('PeriodEverReady', json_encode($everReady, JSON_THROW_ON_ERROR));
         $this->WriteAttributeString('PeriodReadiness', json_encode(array_map(
             static fn($value) => $value !== null, $periods
