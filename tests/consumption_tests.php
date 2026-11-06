@@ -56,7 +56,7 @@ $history=[
  ['TimeStamp'=>$dt('2026-11-03 14:25'),'Value'=>1.715],
  ['TimeStamp'=>$dt('2026-11-04 14:25'),'Value'=>1.853],
 ];
-$opening=['timestamp'=>$dt('2026-10-23 12:00'),'value'=>0.0];
+$opening=['timestamp'=>$dt('2026-10-27 12:00'),'value'=>0.0];
 $before=SuruConsumption::calculate($history,$latest,1.949);
 requireCase($before['24h']===96.0 && $before['7d']===234.0 && $before['30d']===234.0,'before install baseline: correct partial sums');
 $after=SuruConsumption::calculate($history,$latest,1.949,$opening);
@@ -68,4 +68,21 @@ $future=$dt('2027-07-01 12:00');
 requireCase(SuruConsumption::calculate([], $future, 12.0, $opening)['30d']===null,'start outside 30d cannot count as 30d');
 requireCase(SuruConsumption::calculate([], $future, 12.0, $opening)['365d']===12000.0,'start still inside 365d retains total');
 requireCase(SuruConsumption::calculate([], $latest, 1.949, $opening)['30d']===1949.0,'known start may be used without archive');
+// Regression: opening is only effective while the sliding window contains 27 Oct 2026.
+$expired30=$dt('2026-11-26 14:25');
+$expired365=$dt('2027-10-27 14:25');
+$after30=SuruConsumption::calculate([], $expired30, 1.949, $opening);
+requireCase($after30['30d']===null && $after30['365d']===1949.0, '30d start offset expires, 365d still includes installation');
+$afterYear=SuruConsumption::calculate([], $expired365, 1.949, $opening);
+requireCase($afterYear['365d']===null, '365d start offset expires automatically');
+// After the baseline leaves 30d, retain real daily intervals, without reusing installation litres.
+$rowsAfter=[];
+$baseMeasured=$dt('2026-11-03 14:25');
+for($d=0;$d<=23;$d++) {
+    $rowsAfter[]=['TimeStamp'=>$baseMeasured+$d*86400, 'Value'=>1.715+$d*0.100];
+}
+$latestFromRows=end($rowsAfter);
+$after30WithHistory=SuruConsumption::calculate($rowsAfter, (int)$latestFromRows['TimeStamp'], (float)$latestFromRows['Value'], $opening);
+requireCase($after30WithHistory['30d']===2300.0, 'expired offset not included in 30d, observed daily sums remain');
+requireCase($after30WithHistory['365d']===4015.0, '365d still uses full install-to-now counter with no double count');
 echo "ALL CONSUMPTION TESTS PASSED\n";
