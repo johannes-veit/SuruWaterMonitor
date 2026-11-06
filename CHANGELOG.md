@@ -1,10 +1,19 @@
+## 0.1.7 (2026-11-06)
+
+- Optionaler per-Instanz-Einbaustand (`UseInstallReading`, `InstallDate`, `InstallReadingM3`), standardmaessig deaktiviert.
+- Bisher nicht durch Symcon erfasster Anfangsverbrauch wird fuer Zeitfenster ab Einbau ohne Doppelzaehlung beruecksichtigt. Die 24-Stunden- und 7-Tage-Werte bleiben bei Einbau vor mehr als 7 Tagen unveraendert.
+- Einbaustand wird NICHT ins Messwertarchiv geschrieben, sondern nur rechnerisch als Vergleichspunkt verwendet.
+- Strenge Datums- und Plausibilitaetsvalidierung, bestehende Messwerte und Sichtbarkeitseinstellungen unveraendert.
+- Ende-zu-Ende-Test mit 1,715/1,853/1,949 m³ sowie Regressionstests gegen Rueckrechnung, doppelte Summen und falsches Datum.
+
 ## 0.1.6 (2026-11-04)
 
-- Verhindert, dass ein Archiv-Nullwert den 24h-Verbrauch zum Gesamtzählerstand werden lässt.
-- Summiert echte tägliche Differenzen; 7, 30 und 365 Tage zeigen bereits bei kurzer Historie sinnvolle Teilsummen.
-- Keine Hochrechnung bei fehlenden Tagesintervallen; Nullverbrauch wird korrekt berücksichtigt.
-- Historische Werte werden beim Modulupdate erneut berechnet, ohne das Archiv zu verändern.
-- Zusätzliche Tests: 10 Tageswerte, Nullwert-Ausreißer, Archiv-Neuberechnung und Datenlücken.
+- 24h: Fehlerkorrektur bei automatisch archiviertem Nullwert; nur gültige 18–30h-Zählerdifferenz.
+- 7/30/365 Tage: rollierende Summen sämtlicher bereits vorhandener Tagesdifferenzen, auch bei weniger als 7/30/365 Tagen Historie.
+- Echte Tage ohne Verbrauch bleiben 0 L; fehlende Tage werden nicht hochgerechnet oder als gültiger Nulltag gezählt.
+- Schutz gegen unsortierte/duplizierte/verfälschte/abfallende Archivwerte und Messlücken.
+- Beim Update automatische Neuberechnung aus unverändertem Archiv; keine neue API, Instanz, Cloud-Registrierung oder HTML-Ansicht.
+- Zusätzliche Grenzfall- und End-to-End-Tests mit eingefügtem Archiv-Nullwert und 10-Tage-Historie.
 
 ## 0.1.5 (2026-11-03)
 
