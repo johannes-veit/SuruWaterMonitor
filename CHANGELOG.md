@@ -1,3 +1,13 @@
+## 0.1.10 (2026-11-06) – Einmalige automatische Einbaukorrektur
+
+- Eigenständige Selbstkorrektur nach Update für genau die bereits dokumentierte Symcon-Instanz #35654, **nur bei Übereinstimmung beider historischen SURU-Ablesungen** vom 03.11. (1,715 m³) und 04.11.2026 (1,853 m³).
+- Automatisch als gewöhnliche Instanzeigenschaften eingetragen: Einbaustand aktiv, Datum 27.10.2026, Zählerstand 0,000 m³. Kein separates Skript und kein manuelles Übernehmen erforderlich.
+- Änderungen erfolgen durch einen nativen Symcon-Modultimer und IPS_SetProperty/IPS_ApplyChanges, nicht reentrant aus ApplyChanges.
+- Keine automatische Aktivierung für neue bzw. andere Instanzen; bereits manuell konfigurierte Einbaudaten bleiben unverändert.
+- Keine Manipulation der archivierten Messwerte, keine zusätzlichen SURU-Abfragen, keine additive Dauer-Korrektur. Die 30-/365-Tage-Einbauanteile laufen zeitlich begrenzt aus; 24h/7d bleiben unberührt.
+- Die vollständige Moduldiagnose nennt das Ergebnis der einmaligen Migration.
+- Tests mit passender Instanz, abweichendem Zähler, manuell gesetzten Daten und wiederholtem Update ergänzt.
+
 ## 0.1.9 (2026-11-06)
 
 - **24h-Sicherheit:** Tagesverbrauch aus zwei aufeinanderfolgenden bestaetigten SURU-Cloud-Messungen ermittelt. Vorherige Messung als eigenstaendiges Instanzattribut gespeichert (nicht vom sichtbaren Zaehlervariablenwert abhaengig).
