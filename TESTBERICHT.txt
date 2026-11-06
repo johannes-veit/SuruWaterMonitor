@@ -1,16 +1,7 @@
-SURU WaterMonitor v0.1.8 - Entwicklungspruefung, 06.11.2026
+SURU WaterMonitor v0.1.9 – lokale Qualitaetspruefung, 06.11.2026
 
-PHP 8.4: Lint fuer alle PHP-Dateien OK.
-Tests: tests/unit_tests.php OK; tests/api_protocol.php OK;
-tests/consumption_tests.php OK; tests/module_smoke.php OK.
-Reale Zaehlerdaten 03.11.-05.11.: 24h=96 L, 7d=234 L, 30d=1949 L, 365d=1949 L
-(Installationsdatum 27.10.2026, installierter Stand 0,000 m3).
-
-Testfall Grenzuebergang 30d: Fehlende Anfangsphase vom 27.10. bis 03.11.
-wird nur innerhalb des Fensteranteils linear geschaetzt und verschwindet
-vollstaendig, sobald die letzte Messung mehr als 30 Tage nach 03.11. liegt.
-365d analog ein Jahr spaeter. Keine Doppelzaehlung und keine Rueckdatierung.
-
-Achtung: Live-Ausfuehrung auf der SymBox mit v0.1.8 noch nicht geprueft.
-Es wird nur lokale Berechnungslogik/Modulsimulation mit realistisch nachgebildeten
-Cloudwerten getestet. Historische Verteilung vor 03.11. ist grundsaetzlich unbekannt.
+- Tests fuer Tageswert aus zwei echten Cloud-Messungen und Wiederanlauf.
+- 270 deterministische Messabstandsfaelle, einschliesslich 23/25h und 48/72h.
+- Archiv-Nullwert, doppelte Cloud-Abrufe, manuelle Sichtbarkeit,
+  Archivstoerung und Einbaustand-Regression geprueft.
+- Kein Live-Test mit echtem Benutzerkonto aus der lokalen Umgebung moeglich.
