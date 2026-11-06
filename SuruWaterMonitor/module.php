@@ -7,8 +7,11 @@ require_once __DIR__ . '/../libs/Consumption.php';
 /** Unofficial read-only SURU BASIC connection for IP-Symcon >= 8.1. */
 class SuruWaterMonitor extends IPSModuleStrict
 {
-    private const VERSION = '0.1.9';
+    private const VERSION = '0.1.10';
     private const ARCHIVE_MODULE = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
+    // Site-specific, one-time migration. Never apply this baseline to other meters.
+    private const VERIFIED_INSTANCE = 35654;
+    private const VERIFIED_INSTALL_DATE = '2026-10-27';
 
     public function Create(): void
     {
@@ -38,10 +41,12 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->RegisterAttributeString('PeriodEverReady', '{}'); // one-time unhide; manual visibility is respected
         $this->RegisterAttributeString('ConsumptionBasis', '{}'); // computation provenance for diagnostics
         $this->RegisterAttributeString('PreviousReading', ''); // prior accepted cloud snapshot for reliable day delta
+        $this->RegisterAttributeString('AutoInstallMigrationStatus', '');
         $this->RegisterAttributeString('PeriodAutoHidden', '{}'); // temporarily hidden invalid values, restore only when valid
         $this->RegisterTimer('Poll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('FirstPoll', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
         $this->RegisterTimer('Retry', 0, 'IPS_RequestAction($_IPS["TARGET"], "Poll", true);');
+        $this->RegisterTimer('InstallAutoMigration', 0, 'IPS_RequestAction($_IPS["TARGET"], "InstallAutoMigration", true);');
         $this->RegisterVariableFloat('Meter', 'Zählerstand (m³)', [], 10);
         $this->RegisterVariableFloat('Delta', 'Verbrauch seit letzter Messung (Liter)', [], 20);
         $this->RegisterVariableFloat('Month', 'Verbrauch seit erster Monatsmessung (Liter)', [], 30);
@@ -94,6 +99,7 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->writeReport('OFFLINE-PRÜFUNG', $test);
         if (!$valid) $this->SetValue('State', 'WARTE AUF WATERMONITOR BASIC KONTO');
         $this->refreshConsumption(); // only local archive; no cloud requests during updates
+        $this->scheduleAutoInstallMigration(); // background timer within Symcon, no separate user script
     }
 
     public function GetConfigurationForm(): string
@@ -123,6 +129,7 @@ class SuruWaterMonitor extends IPSModuleStrict
     {
         switch ($Ident) {
             case 'Poll': $this->poll(); return;
+            case 'InstallAutoMigration': $this->runAutoInstallMigration(); return;
             case 'OfflineTest':
                 $tests = $this->offlineSelfTest(true);
                 $this->WriteAttributeString('LastFullSelftest', $this->testsOk($tests) ? 'OK' : 'FEHLER');
@@ -221,6 +228,8 @@ class SuruWaterMonitor extends IPSModuleStrict
     {
         $text = 'SURU WaterMonitor v' . self::VERSION . ' – ' . $title . "\nErstellt: " . date('d.m.Y H:i:s') . "\n";
         foreach ($tests as $label => $result) $text .= "{$label}: {$result}\n";
+        $migration = $this->ReadAttributeString('AutoInstallMigrationStatus');
+        if ($migration !== '') $text .= "Einbaustand-Autokorrektur: {$migration}\n";
         if ($title === 'LIVE-PRÜFUNG') {
             $sources = json_decode($this->ReadAttributeString('ConsumptionBasis'), true);
             if (is_array($sources)) {
@@ -321,6 +330,7 @@ class SuruWaterMonitor extends IPSModuleStrict
             $t['Cloud-Aktualität'] = $age > 48 * 3600 ? 'VERALTET' : 'OK';
             $t['Neue Messung'] = $kind;
             $this->writeReport('LIVE-PRÜFUNG', $t);
+            $this->scheduleAutoInstallMigration();
         } catch (SuruException $e) {
             $status = match ($e->httpStatus) {
                 401 => 'ANMELDUNG / FREIGABE PRÜFEN',
@@ -395,6 +405,83 @@ class SuruWaterMonitor extends IPSModuleStrict
             $this->WriteAttributeFloat('MonthAnchor', $value);
         }
         $this->SetValue('Month', max(0, round(($value - $this->ReadAttributeFloat('MonthAnchor')) * 1000, 3)));
+    }
+
+    /**
+     * A one-time, site-specific migration for the already verified 2026 meter.
+     * Require both independently timestamped original readings; a matching
+     * local numeric instance ID alone is never sufficient.
+     * No serial numbers, logins or secrets are included in this public module.
+     */
+    private function verifiedKnownMeter(): bool
+    {
+        if ($this->InstanceID !== self::VERIFIED_INSTANCE ||
+            $this->ReadPropertyBoolean('UseInstallReading') ||
+            trim($this->ReadPropertyString('InstallDate')) !== '' ||
+            $this->ReadAttributeString('AutoInstallMigrationStatus') === 'applied') return false;
+
+        $ts = $this->ReadAttributeInteger('LastTimestamp');
+        $value = $this->ReadAttributeFloat('LastValue');
+        $tz = new DateTimeZone('Europe/Berlin');
+        $known = [
+            [(new DateTimeImmutable('2026-11-03 14:25:00', $tz))->getTimestamp(), 1.715],
+            [(new DateTimeImmutable('2026-11-04 14:25:00', $tz))->getTimestamp(), 1.853],
+        ];
+        $lastKnown = (new DateTimeImmutable('2026-11-05 13:51:00', $tz))->getTimestamp();
+        if ($ts < $lastKnown || $value < 1.9485 || !function_exists('AC_GetLoggedValues')) return false;
+        try {
+            $ids = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE);
+            if (!$ids) return false;
+            $rows = AC_GetLoggedValues((int)$ids[0], $this->GetIDForIdent('History'),
+                $known[0][0] - 3600, $known[1][0] + 3600, 0);
+            if (!is_array($rows)) return false;
+            $matched = [false, false];
+            foreach ($rows as $row) {
+                if (!is_array($row) || !isset($row['TimeStamp'], $row['Value']) || !is_numeric($row['Value'])) continue;
+                foreach ($known as $i => [$time, $counter]) {
+                    if (abs((int)$row['TimeStamp'] - $time) <= 600 &&
+                        abs((float)$row['Value'] - $counter) < 0.0005) $matched[$i] = true;
+                }
+            }
+            return $matched[0] && $matched[1];
+        } catch (Throwable $ignored) {
+            return false; // Retry on next regular poll; never guess.
+        }
+    }
+
+    private function scheduleAutoInstallMigration(): void
+    {
+        $this->SetTimerInterval('InstallAutoMigration', $this->verifiedKnownMeter() ? 2000 : 0);
+    }
+
+    /** Runs by a native Symcon module timer, not from inside ApplyChanges. */
+    private function runAutoInstallMigration(): void
+    {
+        $this->SetTimerInterval('InstallAutoMigration', 0);
+        if (!$this->verifiedKnownMeter()) return;
+        try {
+            // Config is persisted as normal editable instance properties.
+            // This does not write synthetic readings or reset meter archives.
+            if (IPS_SetProperty($this->InstanceID, 'InstallDate', self::VERIFIED_INSTALL_DATE) === false ||
+                IPS_SetProperty($this->InstanceID, 'InstallReadingM3', 0.0) === false ||
+                IPS_SetProperty($this->InstanceID, 'UseInstallReading', true) === false) {
+                $this->WriteAttributeString('AutoInstallMigrationStatus', 'FEHLER: Eigenschaften konnten nicht gespeichert werden');
+                return;
+            }
+            IPS_ApplyChanges($this->InstanceID);
+            if ($this->ReadPropertyBoolean('UseInstallReading') &&
+                $this->ReadPropertyString('InstallDate') === self::VERIFIED_INSTALL_DATE) {
+                $this->WriteAttributeString('AutoInstallMigrationStatus',
+                    'OK: Installationsstand 0,000 m³ vom 27.10.2026 automatisch übernommen');
+                $this->refreshConsumption();
+            } else {
+                $this->WriteAttributeString('AutoInstallMigrationStatus',
+                    'AUSSTEHEND: Konfiguration bei nächster Anwendung prüfen');
+            }
+        } catch (Throwable $ignored) {
+            $this->WriteAttributeString('AutoInstallMigrationStatus',
+                'FEHLER: automatische Installationseinstellung noch nicht übernommen');
+        }
     }
 
     /** Confirmed installation baseline; date-only input uses local noon when the hour is unknown. */
