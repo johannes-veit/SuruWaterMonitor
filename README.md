@@ -1,8 +1,26 @@
+# SURU WaterMonitor BASIC – IP-Symcon 9.0
+
+## v0.1.8 – Gepruefte Verrechnung der Einbaukorrektur (27.10.2026)
+
+**Wichtig:** Die fruehere Version v0.1.7 liess den gesamten Anfangsverbrauch abrupt entfallen, sobald das Einbaudatum aus einem Zeitfenster fiel. Das ist bei einer anfangs fehlenden Tageshistorie rechnerisch zu grob. In v0.1.8 gilt stattdessen:
+
+- Die Messwerte werden nie durch eine feste Korrektur **addiert**. 30/365 Tage ergeben sich jeweils aus dem aktuellen kumulativen Stand minus dem Stand an der Fenstergrenze.
+- Liegt der Einbau am 27.10.2026 innerhalb der letzten 30 bzw. 365 Tage, wird der bekannte Einbaustand 0,000 m³ verwendet: fuer 05.11.2026 ergibt das 1.949 Liter.
+- Wandert die Fenstergrenze in die ungemessene Phase vom **27.10. bis 03.11.2026**, wird deren 1.715-Liter-Verbrauch **gleichmaessig auf die Zeit verteilt – nur als Naeherung**, weil die echten Tagesverbraeuche nicht bekannt sind. Dadurch faellt der fehlende Anteil **anteilig** aus dem Fenster, statt sprunghaft.
+- **30 Tage:** Die Naeherung beginnt um den 26.11.2026 (je nach Messzeit) abzunehmen und ist ab etwa 03.12.2026 vollstaendig verschwunden. **365 Tage:** entsprechend ab etwa 27.10.2027 bis 03.11.2027. Die Startkorrektur wird danach nicht mehr verwendet.
+- **7 Tage** und **24 Stunden** bleiben die beobachteten echten Zaehlermessungen. Bei unvollstaendiger Historie kann der 7-Tage-Wert eine Teilsumme sein. 24h akzeptiert nur zwei genuine Messungen in etwa taeglichem Abstand (18–30h).
+- Bei fehlenden einzelnen Tagesabrufen wird die **bekannte Differenz der Zaehlerstaende ueber die Datenluecke** beruecksichtigt (ohne vorgetaeuschte Einzel-Tageswerte). Nur fuer die Grenzzeit des Fensters wird bei ausreichend nahen Tagesmessungen interpoliert.
+- Archivierte standardmaessige Nullwerte, Rueckspruenge und widerspruechliche Zeitstempel werden verworfen. Das Roharchiv selbst wird nicht veraendert.
+- Die LIVE-Diagnose listet fuer jeden Zeitraum die Berechnungsbasis auf. **Schaetzung** bedeutet: fehlende Verbrauchsverteilung vor Beginn der Cloud-Aufzeichnung, nicht exakte Tagesmessung.
+- Kein HTML, alle Werte bleiben normale IP-Symcon-Variablen. Der Startstand ist weiterhin optional und pro Instanz konfigurierbar. Unter Optionale Einstellungen fuer diesen Zaehler: Startwert aktiv, Datum `2026-10-27`, Stand `0.000 m³`.
+
+---
+
 ## Stand v0.1.7: Einbaustand ohne Archiv-Rueckdatierung
 
 **Neu:** Optionaler Startstand beim Einbau. Fuer einen nachweislich bei 0,000 m³ neu eingebauten Zaehler, bei dem die Symcon-Aufzeichnung erst spaeter begann, wird der lange Zeitraum automatisch mit dem Einbaustand aufgefuellt, **sofern das Einbaudatum innerhalb des jeweiligen 7-/30-/365-Tage-Fensters liegt**. Der Startwert wird niemals als gefaelschte tagesgenaue Messung ins Archiv geschrieben. Sind bereits Tagesverbraeuche vorhanden, wird `letzter Zaehlerstand - Einbaustand` verwendet, NICHT nochmals die Tageswerte darauf addiert. 24h bleibt die reine Messdifferenz.
 
-**Einmalige Einrichtung in bestehender Instanz** (unter *Optionale Einstellungen*): `Bekannten Zaehlerstand ... beruecksichtigen` aktivieren; Einbaudatum als `JJJJ-MM-TT` eingeben (für den hier dokumentierten Zähler `2026-10-27`); Einbaustand `0,000 m³`. Das tatsächliche Einbaudatum ist bekannt und wird nicht als exakte Historienmessung ausgegeben. Ohne diese ausdrueckliche Aktivierung bleiben die bisherigen Standardberechnungen fuer andere Nutzer unveraendert. Ohne Zugriff auf die SymBox kann GitHub diese instanzspezifische Einstellung nicht selber setzen.
+**Einmalige Einrichtung in bestehender Instanz** (unter *Optionale Einstellungen*): `Bekannten Zaehlerstand ... beruecksichtigen` aktivieren; Einbaudatum als `JJJJ-MM-TT` eingeben (beispielsweise `2026-10-23`, wenn der Einbau nur ungefaehr zwei Wochen vor dem 06.11.2026 erfolgte); Einbaustand `0,000 m³`. Das ungefaehre Datum ist eine Schätzung und wird nicht als exakte Historienmessung ausgegeben. Ohne diese ausdrueckliche Aktivierung bleiben die bisherigen Standardberechnungen fuer andere Nutzer unveraendert. Ohne Zugriff auf die SymBox kann GitHub diese instanzspezifische Einstellung nicht selber setzen.
 
 Zum konkreten Zählerstand **1,949 m³ vom 05.11.2026 um 13:51** ergibt sich: **24h 96 L, 7 Tage 234 L, 30 Tage 1.949 L, 365 Tage 1.949 L**. Wenn das Einbaudatum aus dem 30-Tage-Fenster faellt, wird nicht versucht, die nicht taeglich beobachteten alten Verbrauchsmengen kuenstlich auf Tage zu verteilen. Aus der vorhandenen Tageshistorie werden weiterhin alle belegten Teilverbraeuche summiert.
 
