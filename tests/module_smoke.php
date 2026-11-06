@@ -40,6 +40,7 @@ function IPS_SemaphoreEnter(string $name,int $timeout):bool {if ($GLOBALS['semap
 function IPS_SemaphoreLeave(string $name):void {$GLOBALS['semaphoreLocked']=false;}
 
 function IPS_SetHidden(int $var,bool $hidden):void{$GLOBALS['hiddenVars'][$var]=$hidden;}
+function IPS_GetObject(int $var):array{return ['ObjectIsHidden'=>($GLOBALS['hiddenVars'][$var]??false)];}
 function IPS_GetObjectIDByIdent(string $ident,int $parent):int|false{return $ident==='Dashboard' && $GLOBALS['legacyDashboard'] ? 1234:false;}
 function IPS_GetInstanceListByModuleID(string $id):array{return [19];}
 function AC_GetLoggingStatus(int $id,int $var):bool{return !empty($GLOBALS['archived']);}
@@ -50,6 +51,7 @@ function IPS_ApplyChanges(int $id):void{}
 function AC_AddLoggedValues(int $id,int $var,array $v):bool {if (!empty($GLOBALS['archiveFail'])) return false;$GLOBALS['archiveEvents']=array_merge($GLOBALS['archiveEvents'],$v);return true;}
 function AC_ReAggregateVariable(int $id,int $var):void{}
 function AC_GetLoggedValues(int $id,int $var,int $start,int $end,int $limit):array {
+  if (!empty($GLOBALS['archiveReadFail'])) throw new RuntimeException('Mock archive temporarily unreadable');
   $rows=array_values(array_filter($GLOBALS['archiveEvents'], fn($r)=>$r['TimeStamp'] >= $start && $r['TimeStamp'] <= $end));
   usort($rows, fn($a,$b)=>$b['TimeStamp']<=>$a['TimeStamp']);
   return $limit>0 ? array_slice($rows,0,$limit) : array_slice($rows,0,10000);
@@ -173,7 +175,7 @@ t($GLOBALS['hiddenVars'][(crc32('Consumption7d')&0x7fffffff)]===true,'short hist
 $weeklyID=crc32('Consumption7d')&0x7fffffff;
 IPS_SetHidden($weeklyID,false);
 $m3->ApplyChanges();
-t($GLOBALS['hiddenVars'][$weeklyID]===false,'manual unhide is respected for unknown periods');
+t($GLOBALS['hiddenVars'][$weeklyID]===true,'unavailable period is suppressed to avoid false zero');
 // Integration regression: a spurious zero logged at activation must not be
 // subtracted from the cumulative meter. 10 days of readings also populate
 // partial 30/365-day variables without waiting months.
@@ -235,4 +237,50 @@ $m5->props['UseInstallReading']=false;$m5->ApplyChanges();
 t(abs($m5->values['Consumption30d']-234)<.001,'opt-out restores archive-only totals');
 // Never take a newly configured baseline as an invented most-recent daily sample.
 t(abs($m5->values['Consumption24h']-96)<.001,'opt-out preserves 24h measurement');
+
+
+// 0.1.9: 24h consumption must match consecutive confirmed cloud snapshots,
+// and must NOT show a stale daily value after a missed-day gap.
+$GLOBALS['archiveEvents']=[];
+$dayMock=new MockModule();$dayMock->Create();
+$dayMock->props['Email']='me@example.org';$dayMock->props['Password']='fake';
+$dayMock->ApplyChanges();
+$d0=time()-5*86400;
+$feed=function(MockModule $m,float $counter,int $ts):void{
+    $m->mock->r=['reading'=>$counter,'measuredAt'=>gmdate('c',$ts)];
+    $m->RequestAction('Poll',true);
+};
+$feed($dayMock,1.000,$d0);
+$feed($dayMock,1.100,$d0+86400);
+$dayVar=crc32('Consumption24h')&0x7fffffff;
+t(abs($dayMock->values['Consumption24h']-100.0)<.00001,'two real daily cloud readings = 100 L');
+t($GLOBALS['hiddenVars'][$dayVar]===false,'valid daily variable is visible');
+t(str_contains($dayMock->attrs['ConsumptionBasis'],'direkte Cloud-Differenz'),'basis identifies direct cloud data');
+$dayMock->RequestAction('Poll',true);
+t(abs($dayMock->values['Consumption24h']-100.0)<.00001,'duplicate does not change daily value');
+// A 48h interval cannot be presented as a 24h reading: hide it, never set 0.
+$feed($dayMock,1.280,$d0+3*86400);
+t(abs($dayMock->values['Delta']-180.0)<.00001,'missed day: 180 L since last cloud reading');
+t($GLOBALS['hiddenVars'][$dayVar]===true,'48h gap automatically hides misleading 24h display');
+t($dayMock->attrs['PeriodReadiness']!=='' && json_decode($dayMock->attrs['PeriodReadiness'],true)['24h']===false,'48h gap marked unavailable internally');
+t(abs($dayMock->values['Consumption7d']-280.0)<.00001,'7d preserves 2-day interval accurately');
+// When another actual 24h interval arrives, display returns to service.
+$feed($dayMock,1.335,$d0+4*86400);
+t(abs($dayMock->values['Consumption24h']-55.0)<.00001,'valid following day restores exact 55 L');
+t($GLOBALS['hiddenVars'][$dayVar]===false,'temporarily hidden day restored');
+// A manually hidden variable remains hidden after future accepted readings.
+IPS_SetHidden($dayVar,true);
+$feed($dayMock,1.390,$d0+5*86400);
+t($GLOBALS['hiddenVars'][$dayVar]===true,'manual hide remains respected even with new daily reading');
+// The daily figure remains exact when historical archive reads are temporarily unavailable.
+$GLOBALS['archiveReadFail']=true;
+$dayMock->ApplyChanges();
+t(abs($dayMock->values['Consumption24h']-55.0)<.00001,'direct cloud-pair daily value survives archive outage');
+t(json_decode($dayMock->attrs['PeriodReadiness'],true)['24h']===true,'direct daily validity retained without archive');
+$GLOBALS['archiveReadFail']=false;
+$dayMock->ApplyChanges();
+// When false archive readings exist, they must not override the true cloud pair.
+$GLOBALS['archiveEvents'][]=['TimeStamp'=>$d0+4*86400+5*3600,'Value'=>0.0];
+$dayMock->ApplyChanges();
+t(abs($dayMock->values['Consumption24h']-55.0)<.00001,'archive startup zero never overrides accepted cloud daily pair');
 echo "ALL MODULE TESTS PASSED\n";
