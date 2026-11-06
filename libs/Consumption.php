@@ -14,9 +14,10 @@ final class SuruConsumption
 
     /**
      * @param array<int,array<string,mixed>> $archivedRows Raw AC_GetLoggedValues (any order).
+     * @param array{timestamp:int,value:float}|null $opening Verified installation reference, not an archive record.
      * @return array{24h:?float,7d:?float,30d:?float,365d:?float} Litres; null when no valid daily data.
      */
-    public static function calculate(array $archivedRows, int $latestTime, float $latestValue): array
+    public static function calculate(array $archivedRows, int $latestTime, float $latestValue, ?array $opening = null): array
     {
         $result = ['24h' => null, '7d' => null, '30d' => null, '365d' => null];
         if ($latestTime <= 0 || !is_finite($latestValue) || $latestValue < 0) {
@@ -89,6 +90,24 @@ final class SuruConsumption
         foreach ($sums as $key => $sum) {
             if ($counts[$key] > 0) {
                 $result[$key] = round($sum, 3);
+            }
+        }
+        // The installation reference can fill long windows that include the
+        // installation date, even when monitoring started later. Replace the
+        // observed-day subtotal; never add it twice. 24h is never overridden.
+        if ($opening !== null && isset($opening['timestamp'], $opening['value'])) {
+            $openingTime = (int) $opening['timestamp'];
+            $openingValue = (float) $opening['value'];
+            $oldestRecorded = $verified === [] ? $latestTime : (int) array_key_first($verified);
+            $valid = $openingTime >= 946684800 && $openingTime < $latestTime &&
+                $openingTime <= $oldestRecorded && is_finite($openingValue) &&
+                $openingValue >= 0 && $openingValue <= $latestValue + self::EPS;
+            if ($valid) {
+                foreach (['7d' => 7, '30d' => 30, '365d' => 365] as $key => $days) {
+                    if ($openingTime >= $latestTime - $days * self::DAY) {
+                        $result[$key] = round(max(0.0, ($latestValue - $openingValue) * 1000), 3);
+                    }
+                }
             }
         }
         return $result;
