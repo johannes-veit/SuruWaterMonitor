@@ -29,6 +29,28 @@
           "caption": "Abrufintervall in Minuten",
           "minimum": 30,
           "maximum": 1440
+        },
+        {
+          "type": "Label",
+          "caption": "Optional: Einbaustand ergaenzen, wenn der Wasserzaehler schon vor Beginn der Symcon-Aufzeichnung installiert wurde."
+        },
+        {
+          "type": "CheckBox",
+          "name": "UseInstallReading",
+          "caption": "Bekannten Zaehlerstand bei Einbau beruecksichtigen"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "InstallDate",
+          "caption": "Einbaudatum JJJJ-MM-TT (bei Bedarf ungefaehr)"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "InstallReadingM3",
+          "caption": "Zaehlerstand beim Einbau (m³)",
+          "minimum": 0,
+          "digits": 3,
+          "suffix": "m³"
         }
       ]
     }
