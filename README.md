@@ -1,3 +1,11 @@
+## v0.1.10 – Automatische Einbaustand-Migration für den dokumentierten Wasserzähler
+
+Die konkrete, bereits vorhandene **Symcon-Instanz #35654** übernimmt beim ersten Update automatisch den verifizierten Einbaustand: **27.10.2026, 0,000 m³**. Es ist **kein separates PHP-Skript** und keine manuelle Konfigurationsänderung nötig. Die Modulinstanz startet einen eigenen einmaligen Migrationstimer (2 Sekunden), der die drei normalen IP-Symcon-Eigenschaften aktualisiert und die bisherigen Verbrauchsvariablen sofort neu berechnet. Das funktioniert auch bei einem unveränderten, nur erneut übertragenen Cloud-Messwert.
+
+Die Änderung wird **nur** ausgeführt, wenn zugleich die beiden bekannten Archivwerte vom 03.11.2026 14:25 (1,715 m³) und 04.11.2026 14:25 (1,853 m³) vorhanden sind und keine Einbaukonfiguration bereits gesetzt wurde. Andere Zähler und Instanzen bleiben unberührt. Sind die historischen Messwerte nicht lesbar, wird **nichts erfunden**; ein späterer erfolgreicher Cloud-Abruf versucht die Prüfung erneut. In der Diagnose erscheint der Migrationsstatus.
+
+Die 1.715 Liter Anfangsverbrauch sind **kein Festwert**, der dauerhaft addiert wird. Die 30-/365-Tage-Werte werden weiterhin aus zeitabhängigen Zählerdifferenzen bestimmt und der zunächst nicht tageweise gemessene Abschnitt 27.10.–03.11. läuft automatisch aus. Die Berechnungen für 24 Stunden und sieben Tage bleiben unverändert. Alle Variablen sind native Symcon-Variablen.
+
 ## Stand v0.1.9: 24-Stunden-Tageswerte gegen Cloud-Differenzen verifiziert
 
 Das Modul speichert bei jeder neu akzeptierten Cloud-Messung auch die vorherige
@@ -41,7 +49,7 @@ Alle bisher sichtbaren Standard-Variablen und ihre Idents bleiben erhalten.
 
 **Neu:** Optionaler Startstand beim Einbau. Fuer einen nachweislich bei 0,000 m³ neu eingebauten Zaehler, bei dem die Symcon-Aufzeichnung erst spaeter begann, wird der lange Zeitraum automatisch mit dem Einbaustand aufgefuellt, **sofern das Einbaudatum innerhalb des jeweiligen 7-/30-/365-Tage-Fensters liegt**. Der Startwert wird niemals als gefaelschte tagesgenaue Messung ins Archiv geschrieben. Sind bereits Tagesverbraeuche vorhanden, wird `letzter Zaehlerstand - Einbaustand` verwendet, NICHT nochmals die Tageswerte darauf addiert. 24h bleibt die reine Messdifferenz.
 
-**Einmalige Einrichtung in bestehender Instanz** (unter *Optionale Einstellungen*): `Bekannten Zaehlerstand ... beruecksichtigen` aktivieren; Einbaudatum als `JJJJ-MM-TT` eingeben (beispielsweise `2026-10-23`, wenn der Einbau nur ungefaehr zwei Wochen vor dem 06.11.2026 erfolgte); Einbaustand `0,000 m³`. Das ungefaehre Datum ist eine Schätzung und wird nicht als exakte Historienmessung ausgegeben. Ohne diese ausdrueckliche Aktivierung bleiben die bisherigen Standardberechnungen fuer andere Nutzer unveraendert. Ohne Zugriff auf die SymBox kann GitHub diese instanzspezifische Einstellung nicht selber setzen.
+**Einmalige Einrichtung in bestehender Instanz** (unter *Optionale Einstellungen*): `Bekannten Zaehlerstand ... beruecksichtigen` aktivieren; Einbaudatum als `JJJJ-MM-TT` eingeben (`2026-10-27` fuer den beschriebenen Wasserzaehler); Einbaustand `0,000 m³`. Das ungefaehre Datum ist eine Schätzung und wird nicht als exakte Historienmessung ausgegeben. Ohne diese ausdrueckliche Aktivierung bleiben die bisherigen Standardberechnungen fuer andere Nutzer unveraendert. Ohne Zugriff auf die SymBox kann GitHub diese instanzspezifische Einstellung nicht selber setzen.
 
 Zum konkreten Zählerstand **1,949 m³ vom 05.11.2026 um 13:51** ergibt sich: **24h 96 L, 7 Tage 234 L, 30 Tage 1.949 L, 365 Tage 1.949 L**. Wenn das Einbaudatum aus dem 30-Tage-Fenster faellt, wird nicht versucht, die nicht taeglich beobachteten alten Verbrauchsmengen kuenstlich auf Tage zu verteilen. Aus der vorhandenen Tageshistorie werden weiterhin alle belegten Teilverbraeuche summiert.
 
