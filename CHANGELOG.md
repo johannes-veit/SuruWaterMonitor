@@ -1,3 +1,12 @@
+## 0.1.9 (2026-11-06)
+
+- **24h-Sicherheit:** Tagesverbrauch aus zwei aufeinanderfolgenden bestaetigten SURU-Cloud-Messungen ermittelt. Vorherige Messung als eigenstaendiges Instanzattribut gespeichert (nicht vom sichtbaren Zaehlervariablenwert abhaengig).
+- 18 bis 30 Stunden Messabstand: echte Verbrauchsdifferenz in Litern (Messdauer in der Diagnose); 48-Stunden-Messluecke: kein falscher 24h-Wert. Der Verbrauch ueber den gesamten Abstand bleibt als `Delta` und in laengeren Perioden nachvollziehbar.
+- Ungueltige/nicht verfuegbare Zeitraeume werden temporaer ausgeblendet, statt einen veralteten Zahlenwert zu zeigen; bei wieder gueltigen Daten wird eine zuvor sichtbare Variable wieder eingeblendet. Manuelles Ausblenden bleibt respektiert.
+- Stundliche doppelte Cloud-Abfragen schreiben weder neue Tageswerte noch Archivduplikate.
+- Erweiterte Simulation: manuell versteckte Variablen, temporaer nicht lesbares Archiv, 48-Stunden-Luecke, Folgetag, Archiv-Nullwert, 270 Zeitgrenzen-Faelle inkl. 23/25 h.
+- 7-/30-/365-Tage-Verrechnung, Einbaustand 27.10.2026 und bisherige Archivdaten unveraendert.
+
 ## 0.1.8 (2026-11-06)
 
 - Grenzfall korrigiert: Einbauverbrauch faellt bei 30/365 Tagen beim Fensterwechsel nicht abrupt als Gesamtsumme weg, sondern nimmt im unbekannten Intervall 27.10.–03.11. anteilig ab (explizit als Schaetzung markiert).
