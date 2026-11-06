@@ -47,7 +47,18 @@ function AC_GetLoggingStatus(int $id,int $var):bool{return !empty($GLOBALS['arch
 function AC_GetAggregationType(int $id,int $var):int{return $GLOBALS['archiveAggregation'];}
 function AC_SetLoggingStatus(int $id,int $var,bool $state):bool{$GLOBALS['archived']=true;return true;}
 function AC_SetAggregationType(int $id,int $var,int $type):bool{$GLOBALS['archiveAggregation']=$type;return true;}
-function IPS_ApplyChanges(int $id):void{}
+$GLOBALS['mockInstances'] = [];
+$GLOBALS['migrationApplyCount'] = 0;
+function IPS_SetProperty(int $id, string $key, mixed $value): bool {
+  if (!isset($GLOBALS['mockInstances'][$id])) return false;
+  $GLOBALS['mockInstances'][$id]->props[$key] = $value;
+  return true;
+}
+function IPS_ApplyChanges(int $id):void {
+  if (!isset($GLOBALS['mockInstances'][$id])) return; // Archive Control
+  if (++$GLOBALS['migrationApplyCount'] > 10) throw new RuntimeException('unexpected recursive ApplyChanges');
+  $GLOBALS['mockInstances'][$id]->ApplyChanges();
+}
 function AC_AddLoggedValues(int $id,int $var,array $v):bool {if (!empty($GLOBALS['archiveFail'])) return false;$GLOBALS['archiveEvents']=array_merge($GLOBALS['archiveEvents'],$v);return true;}
 function AC_ReAggregateVariable(int $id,int $var):void{}
 function AC_GetLoggedValues(int $id,int $var,int $start,int $end,int $limit):array {
@@ -283,4 +294,51 @@ $dayMock->ApplyChanges();
 $GLOBALS['archiveEvents'][]=['TimeStamp'=>$d0+4*86400+5*3600,'Value'=>0.0];
 $dayMock->ApplyChanges();
 t(abs($dayMock->values['Consumption24h']-55.0)<.00001,'archive startup zero never overrides accepted cloud daily pair');
+
+
+// v0.1.10: the owner's existing instance migrates itself on the update timer.
+// Crucially, matching numerical InstanceID alone does not trigger a change.
+$tz = new DateTimeZone('Europe/Berlin');
+$ts = static fn(string $t): int => (new DateTimeImmutable($t, $tz))->getTimestamp();
+$GLOBALS['archiveEvents'] = [
+ ['TimeStamp'=>$ts('2026-11-03 14:25:00'),'Value'=>1.715],
+ ['TimeStamp'=>$ts('2026-11-04 14:25:00'),'Value'=>1.853],
+];
+$auto=new MockModule();$auto->InstanceID=35654;$auto->Create();
+$auto->props['Email']='me@example.org';$auto->props['Password']='fake';
+$auto->attrs['LastTimestamp']=$ts('2026-11-05 13:51:00');
+$auto->attrs['LastValue']=1.949;
+$GLOBALS['mockInstances'][35654]=$auto;
+$before=count($GLOBALS['archiveEvents']);
+$auto->ApplyChanges();
+t($auto->timers['InstallAutoMigration']===2000,'on update, known instance schedules a native migration timer');
+t($auto->props['UseInstallReading']===false, 'migration waits for native timer, not reentrant in ApplyChanges');
+$auto->RequestAction('InstallAutoMigration',true);
+t($auto->props['UseInstallReading']===true,'automatic install baseline activated without user script');
+t($auto->props['InstallDate']==='2026-10-27','known exact installation date selected automatically');
+t($auto->props['InstallReadingM3']===0.0,'exact installed zero saved');
+t(abs($auto->values['Consumption30d']-1949.0)<.001 && abs($auto->values['Consumption365d']-1949.0)<.001,'30d and 365d repaired at once');
+t(abs($auto->values['Consumption7d']-234.0)<.001,'short 7-day period remains genuine partial history with no fabricated date');
+t($auto->timers['InstallAutoMigration']===0,'successful migration cancels its own timer');
+t(count($GLOBALS['archiveEvents'])===$before,'no historical archive modifications on auto migration');
+$applyBefore=$GLOBALS['migrationApplyCount'];
+$auto->ApplyChanges();
+t($auto->timers['InstallAutoMigration']===0 && $GLOBALS['migrationApplyCount']===$applyBefore, 'idempotent: no endless reapply');
+// Other instances and manually configured instances must never be modified.
+$other=new MockModule();$other->Create();$other->props['Email']='me@example.org';$other->props['Password']='fake';
+$other->attrs['LastTimestamp']=$ts('2026-11-05 13:51:00');$other->attrs['LastValue']=1.949;
+$other->ApplyChanges();
+t($other->timers['InstallAutoMigration']===0,'different Symcon instance never receives known opening baseline');
+$wrong=new MockModule();$wrong->InstanceID=35654;$wrong->Create();
+$wrong->props['Email']='me@example.org';$wrong->props['Password']='fake';
+$wrong->attrs['LastTimestamp']=$ts('2026-11-05 13:51:00');$wrong->attrs['LastValue']=1.949;
+$GLOBALS['mockInstances'][35654]=$wrong;
+$GLOBALS['archiveEvents'][0]['Value']=1.714;
+$wrong->ApplyChanges();
+t($wrong->timers['InstallAutoMigration']===0,'incorrect 03 Nov archive fingerprint blocks automatic changes');
+$GLOBALS['archiveEvents'][0]['Value']=1.715;
+$wrong->props['InstallDate']='2026-10-26'; // user supplied different date: do not overwrite
+$wrong->ApplyChanges();
+t($wrong->timers['InstallAutoMigration']===0,'user-configured installation date always wins');
+unset($GLOBALS['mockInstances'][35654]);
 echo "ALL MODULE TESTS PASSED\n";
