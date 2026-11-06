@@ -1,3 +1,24 @@
+## Stand v0.1.9: 24-Stunden-Tageswerte gegen Cloud-Differenzen verifiziert
+
+Das Modul speichert bei jeder neu akzeptierten Cloud-Messung auch die vorherige
+akzeptierte Messung als *internes* Attribut. Wenn die Zeit zwischen beiden
+Messungen 18–30 Stunden betraegt, wird `Consumption24h` direkt aus
+`(aktueller Stand - vorheriger Stand) × 1000` berechnet. Diese Tagesdifferenz
+bleibt auch bei einem temporaer nicht lesbaren Symcon-Archiv nachweisbar.
+
+Ein Ausfall einer Tagesablesung (z. B. 48 h Messabstand) ist **kein**
+24-Stunden-Verbrauch: der bisherige Tageswert wird in der Visualisierung
+voruebergehend ausgeblendet, bis wieder zwei Tagesablesungen vorliegen.
+`Delta` zeigt weiterhin den echten Verbrauch seit dem vorherigen Abrufpunkt,
+auch wenn dieser mehrere Tage zurueckliegt. Ein echter gemessener
+Nullverbrauch bleibt sichtbar 0 Liter.
+
+Andere Verbrauchsfenster werden weiterhin aus allen verfuegbaren echten
+Messstaenden berechnet. Tagesgrenzen ohne genau passenden Messpunkt sind
+Naeherungen und werden im Diagnosebericht gekennzeichnet. Die einmalige
+Einbaukorrektur 27.10.2026, 0,000 m³, beeinflusst niemals `Consumption24h`.
+Alle bisher sichtbaren Standard-Variablen und ihre Idents bleiben erhalten.
+
 # SURU WaterMonitor BASIC – IP-Symcon 9.0
 
 ## v0.1.8 – Gepruefte Verrechnung der Einbaukorrektur (27.10.2026)
