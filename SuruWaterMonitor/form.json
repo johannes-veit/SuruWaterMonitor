@@ -32,25 +32,28 @@
         },
         {
           "type": "Label",
-          "caption": "Optional: Einbaustand ergaenzen, wenn der Wasserzaehler schon vor Beginn der Symcon-Aufzeichnung installiert wurde."
+          "caption": "Einbaustand (optional): Nur bei einem bekannten Startzaehlerstand. Kein zusaetzlicher Cloud-Abruf."
         },
         {
           "type": "CheckBox",
           "name": "UseInstallReading",
-          "caption": "Bekannten Zaehlerstand bei Einbau beruecksichtigen"
+          "caption": "Bekannten Zaehlerstand bei Einbau fuer lange Zeitraeume beruecksichtigen"
         },
         {
           "type": "ValidationTextBox",
           "name": "InstallDate",
-          "caption": "Einbaudatum JJJJ-MM-TT (bei Bedarf ungefaehr)"
+          "caption": "Einbaudatum (JJJJ-MM-TT, bei Bedarf ungefaehr)"
         },
         {
           "type": "NumberSpinner",
           "name": "InstallReadingM3",
           "caption": "Zaehlerstand beim Einbau (m³)",
           "minimum": 0,
-          "digits": 3,
-          "suffix": "m³"
+          "digits": 3
+        },
+        {
+          "type": "Label",
+          "caption": "Bei unbekannter Einbau-Uhrzeit wird lokal 12:00 angenommen. Die Einbaukorrektur ist nur fuer 30/365 Tage aktiv und laeuft nach dem Einbau schrittweise aus."
         }
       ]
     }
