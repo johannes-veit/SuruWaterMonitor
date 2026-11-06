@@ -1,17 +1,23 @@
-## Stand v0.1.6 – Korrektur der Verbrauchsberechnung (04.11.2026)
+## Stand v0.1.7: Einbaustand ohne Archiv-Rueckdatierung
 
-**Nur normale Symcon-Variablen.** Die bisherige 24-h-Berechnung konnte einen automatisch protokollierten Nullwert als echten Zählerstand interpretieren. Jetzt werden ausschließlich plausible tägliche Differenzen zwischen gültigen aufeinanderfolgenden Zählerständen addiert.
+**Neu:** Optionaler Startstand beim Einbau. Fuer einen nachweislich bei 0,000 m³ neu eingebauten Zaehler, bei dem die Symcon-Aufzeichnung erst spaeter begann, wird der lange Zeitraum automatisch mit dem Einbaustand aufgefuellt, **sofern das Einbaudatum innerhalb des jeweiligen 7-/30-/365-Tage-Fensters liegt**. Der Startwert wird niemals als gefaelschte tagesgenaue Messung ins Archiv geschrieben. Sind bereits Tagesverbraeuche vorhanden, wird `letzter Zaehlerstand - Einbaustand` verwendet, NICHT nochmals die Tageswerte darauf addiert. 24h bleibt die reine Messdifferenz.
 
-- **24 Stunden:** Differenz der letzten beiden gültigen Messungen im Abstand von 18–30 Stunden, in Litern. Niemals der gesamte m³-Zählerstand.
-- **7 Tage:** Summe der verfügbaren Tagesdifferenzen innerhalb der letzten sieben Tage.
-- **30 und 365 Tage:** ebenfalls Summen der bereits verfügbaren Tagesdifferenzen; bei kürzerer Historie bewusst Teilsummen (z. B. 10 vorhandene Tage).
-- **Fehlende Tage:** keine Hochrechnung, keine künstlichen Nulltage. Echte Tage ohne Verbrauch ergeben 0 L.
-- **Archivschutz:** widersprüchliche Null-/Rücksprungwerte werden für die Berechnung verworfen; der bestehende Archivinhalt wird nicht verändert.
-- **Update:** dieselbe Modulinstanz aktualisieren und einmal **Übernehmen** drücken. Bereits gespeicherte fehlerhafte Variablenwerte werden aus der Historie neu berechnet. Zugangsdaten und Zählerregistrierung bleiben unverändert.
+**Einmalige Einrichtung in bestehender Instanz** (unter *Optionale Einstellungen*): `Bekannten Zaehlerstand ... beruecksichtigen` aktivieren; Einbaudatum als `JJJJ-MM-TT` eingeben (beispielsweise `2026-10-23`, wenn der Einbau nur ungefaehr zwei Wochen vor dem 06.11.2026 erfolgte); Einbaustand `0,000 m³`. Das ungefaehre Datum ist eine Schätzung und wird nicht als exakte Historienmessung ausgegeben. Ohne diese ausdrueckliche Aktivierung bleiben die bisherigen Standardberechnungen fuer andere Nutzer unveraendert. Ohne Zugriff auf die SymBox kann GitHub diese instanzspezifische Einstellung nicht selber setzen.
 
----
+Zum konkreten Zählerstand **1,949 m³ vom 05.11.2026 um 13:51** ergibt sich: **24h 96 L, 7 Tage 234 L, 30 Tage 1.949 L, 365 Tage 1.949 L**. Wenn das Einbaudatum aus dem 30-Tage-Fenster faellt, wird nicht versucht, die nicht taeglich beobachteten alten Verbrauchsmengen kuenstlich auf Tage zu verteilen. Aus der vorhandenen Tageshistorie werden weiterhin alle belegten Teilverbraeuche summiert.
+
+Weiterhin nur lokale Standard-Symcon-Variablen, weder HTML noch kostenpflichtige SURU-Endpunkte. Bestehende Variablen-Idents, Zugangsdaten, Zaehlerbindung und Archiv bleiben erhalten.
 
 # SURU WaterMonitor BASIC – IP-Symcon 9.0
+
+## Stand v0.1.6: tägliche Differenzen und Teilzeiträume
+
+- **Fehlerbehebung:** Der 24-h-Verbrauch wird nicht mehr aus einem irrtümlichen Nullwert im Archiv vom Gesamtzählerstand abgezogen. Nur plausible Differenzen zwischen echten Tageszählerständen (18–30 h Messabstand) werden gezählt.
+- **7/30/365 Tage:** Summe aller in der jeweiligen Zeitspanne bereits tatsächlich verfügbaren täglichen Differenzen. Beispiel bei zehn erfassten Tagen: 7 Tage = sieben bekannte Tageswerte, 30 und 365 Tage = Summe aller zehn Tageswerte. Bereits ein gültiger Tag befüllt alle drei Summen.
+- **Keine Hochrechnung:** Fehlende Tage werden weder als 0 Verbrauch dargestellt noch mit geschätztem Verbrauch aufgefüllt. Es handelt sich bei kurzer Historie ausdrücklich um **Teilsummen**.
+- **Reparatur beim Update:** Die Modulinstanz berechnet alle vier Variablen beim nächsten **Übernehmen** erneut aus den vorhandenen Archivwerten; alte Fehlwerte werden überschrieben. Benutzer-Sichtbarkeit, Kontoanmeldung und Archiv bleiben unangetastet.
+- **Keine Webkachel:** Ausschließlich normale Symcon-Variablen, separat in der Standard-Visualisierung auswählbar.
+
 
 Inoffizielles, **rein lesendes** IP-Symcon-Modul zur Auswertung eines SURU-/WaterMonitor-Kontos. Entwickelt mit Fokus auf das **kostenlose BASIC-Konto** und die SymBox. Kein Home Assistant, keine zusätzliche Hardware, keine kostenpflichtigen SURU-Funktionen.
 
@@ -32,9 +38,9 @@ Für die Visualisierung sind besonders geeignet:
 
 Optional bleiben `Delta` (Liter seit letzter Messung) und `Month` (Liter seit erster Messung im aktuellen Monat) sowie Diagnose/Status verfügbar.
 
-**Messgenauigkeit:** Alle Fenster enden mit dem letzten tatsächlichen Messzeitpunkt, nicht mit dem Cloud-Abruf. Für 7/30/365 Tage gilt eine Toleranz von ±18 Stunden am ältesten Vergleichspunkt; die Werte sind daher Näherungen aus Tagesablesungen. Der Wert 24h wird nur bei 18–30 Stunden Messabstand berechnet. Keine Hochrechnung ohne Daten.
+**Messgenauigkeit:** Alle Fenster enden mit dem letzten tatsächlichen Messzeitpunkt, nicht mit dem Cloud-Abruf. Für 7/30/365 Tage werden alle verfügbaren Tagesdifferenzen innerhalb der Zeitfenster addiert. Falls die Historie kürzer ist, erscheint eine Teilsumme; fehlende Tage werden nicht ergänzt. Der Wert 24h wird nur bei 18–30 Stunden Messabstand berechnet. Keine Hochrechnung ohne Daten.
 
-**Datenverfügbarkeit:** Ein erstmals angelegter Zeitraum wird bis zur ersten gültigen Berechnung in der Objektansicht verborgen und danach genau einmal automatisch eingeblendet. Ab dann werden manuelle Sichtbarkeitseinstellungen ausdrücklich respektiert, auch bei Modulupdates und weiteren Abfragen. Bereits vom Benutzer ausgeblendete, zuvor berechnete Zeiträume bleiben ausgeblendet. Bei fehlender Historie wird kein neuer Nullwert geschrieben. Die Objektvariable kann technisch jedoch den Startwert 0 zeigen, falls man sie vor der ersten gültigen Messung manuell sichtbar macht; ob der Wert bereits berechnet werden konnte, ist im internen `PeriodReadiness`-Status hinterlegt.
+**Datenverfügbarkeit:** Ein erstmals angelegter Zeitraum wird bis zum ersten gültigen Tagesintervall in der Objektansicht verborgen und danach genau einmal automatisch eingeblendet. Ab dann werden manuelle Sichtbarkeitseinstellungen ausdrücklich respektiert, auch bei Modulupdates und weiteren Abfragen. Bereits vom Benutzer ausgeblendete, zuvor berechnete Zeiträume bleiben ausgeblendet. Bei fehlender Historie wird kein neuer Nullwert geschrieben. Die Objektvariable kann technisch jedoch den Startwert 0 zeigen, falls man sie vor der ersten gültigen Messung manuell sichtbar macht; ob der Wert bereits berechnet werden konnte, ist im internen `PeriodReadiness`-Status hinterlegt.
 
 **Historie:** Das vorhandene Symcon-Archiv (`History`) bleibt unverändert und wird nur mit bestätigten echten Zählerständen erweitert. Keine kostenpflichtigen BASIC-Endpunkte.
 
