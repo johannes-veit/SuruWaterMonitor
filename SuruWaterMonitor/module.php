@@ -7,7 +7,7 @@ require_once __DIR__ . '/../libs/Consumption.php';
 /** Unofficial read-only SURU BASIC connection for IP-Symcon >= 8.1. */
 class SuruWaterMonitor extends IPSModuleStrict
 {
-    private const VERSION = '0.1.6';
+    private const VERSION = '0.1.7';
     private const ARCHIVE_MODULE = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
 
     public function Create(): void
@@ -17,6 +17,10 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->RegisterPropertyString('Password', '');
         $this->RegisterPropertyString('MeterSerial', '');
         $this->RegisterPropertyInteger('IntervalMinutes', 60);
+        // Optional starting counter; only applies to this instance.
+        $this->RegisterPropertyBoolean('UseInstallReading', false);
+        $this->RegisterPropertyString('InstallDate', '');
+        $this->RegisterPropertyFloat('InstallReadingM3', 0.0);
         // Existing property names, idents and GUIDs are deliberately kept intact.
         $this->RegisterAttributeString('UnitID', '');
         $this->RegisterAttributeString('SelectedSerial', '');
@@ -92,6 +96,17 @@ class SuruWaterMonitor extends IPSModuleStrict
     {
         $form = json_decode((string) file_get_contents(__DIR__ . '/form.json'), true, 512, JSON_THROW_ON_ERROR);
         $form['actions'][0]['caption'] = 'Aktueller Status: ' . (string) $this->GetValue('State');
+        if ($this->ReadPropertyBoolean('UseInstallReading')) {
+            $opening = $this->openingReading();
+            $form['elements'][3]['items'][] = [
+                'type' => 'Label',
+                'caption' => $opening === null
+                    ? 'ACHTUNG: Startdatum ungueltig. Format JJJJ-MM-TT, z.B. 2026-10-23. Die bisherige Berechnung bleibt aktiv.'
+                    : 'Startstand aktiv: ' . number_format($opening['value'], 3, ',', '.') .
+                      ' m³ am ' . date('d.m.Y', $opening['timestamp']) .
+                      '. Zaehlt nur fuer Zeitraeume, welche den Einbau einschliessen.',
+            ];
+        }
         // Full reports can be large. They are stored in the Report variable for copying.
         $report = $this->ReadAttributeString('LastReport');
         $form['actions'][1]['caption'] = 'Selbsttest: ' . $this->ReadAttributeString('LastFullSelftest') .
@@ -361,26 +376,41 @@ class SuruWaterMonitor extends IPSModuleStrict
         $this->SetValue('Month', max(0, round(($value - $this->ReadAttributeFloat('MonthAnchor')) * 1000, 3)));
     }
 
+    /** Optional starting counter. It is not inserted into the meter archive. */
+    private function openingReading(): ?array
+    {
+        if (!$this->ReadPropertyBoolean('UseInstallReading')) return null;
+        $raw = trim($this->ReadPropertyString('InstallDate'));
+        if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}$/D', $raw)) return null;
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i', $raw . ' 12:00',
+            new DateTimeZone(date_default_timezone_get()));
+        if ($date === false || $date->format('Y-m-d') !== $raw) return null;
+        $value = $this->ReadPropertyFloat('InstallReadingM3');
+        if (!is_finite($value) || $value < 0) return null;
+        return ['timestamp' => $date->getTimestamp(), 'value' => $value];
+    }
+
     /** Calculate from the existing timestamp archive; never touches vendor's paid endpoints. */
     private function refreshConsumption(): void
     {
         $lastTime = $this->ReadAttributeInteger('LastTimestamp');
         $lastValue = $this->ReadAttributeFloat('LastValue');
         $periods = ['24h' => null, '7d' => null, '30d' => null, '365d' => null];
-        if ($lastTime > 0 && $lastValue >= 0 && function_exists('AC_GetLoggedValues')) {
-            try {
-                $archives = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE);
-                if ($archives) {
-                    // Daily samples require only ~370 rows, and nothing is backdated.
-                    $from = $lastTime - 365 * 86400 - 30 * 3600;
-                    $history = AC_GetLoggedValues((int) $archives[0], $this->GetIDForIdent('History'), $from, $lastTime, 0);
-                    if (is_array($history)) {
-                        $periods = SuruConsumption::calculate($history, $lastTime, $lastValue);
+        $history = [];
+        if ($lastTime > 0 && $lastValue >= 0) {
+            if (function_exists('AC_GetLoggedValues')) {
+                try {
+                    $archives = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE);
+                    if ($archives) {
+                        $from = $lastTime - 365 * 86400 - 30 * 3600;
+                        $rows = AC_GetLoggedValues((int) $archives[0], $this->GetIDForIdent('History'), $from, $lastTime, 0);
+                        if (is_array($rows)) $history = $rows;
                     }
+                } catch (Throwable $ignored) {
+                    // The confirmed installation baseline remains usable on archive outages.
                 }
-            } catch (Throwable $ignored) {
-                // A temporary archive failure must not fabricate consumption values.
             }
+            $periods = SuruConsumption::calculate($history, $lastTime, $lastValue, $this->openingReading());
         }
         $idents = ['24h' => 'Consumption24h', '7d' => 'Consumption7d', '30d' => 'Consumption30d', '365d' => 'Consumption365d'];
         $previous = json_decode($this->ReadAttributeString('PeriodReadiness'), true);
