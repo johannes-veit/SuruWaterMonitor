@@ -46,4 +46,26 @@ $c = SuruConsumption::calculate([['TimeStamp'=>$base-2*$day,'Value'=>499.9]],$ba
 requireCase($c['24h']===null && $c['7d']===null, '48h gap does not invent missing day');
 $c = SuruConsumption::calculate([['TimeStamp'=>$base-$day,'Value'=>500.0]],$base,500.0);
 requireCase($c['24h']===0.0 && $c['30d']===0.0, 'genuine null consumption remains zero');
+
+// Installation reference is valid for the owner's known new meter only.
+// Two daily measurements = 138+96 L; earlier water use = 1715 L.
+$zone=new DateTimeZone('Europe/Berlin');
+$dt=function(string $date)use($zone):int {return (new DateTimeImmutable($date,$zone))->getTimestamp();};
+$latest=$dt('2026-11-05 13:51');
+$history=[
+ ['TimeStamp'=>$dt('2026-11-03 14:25'),'Value'=>1.715],
+ ['TimeStamp'=>$dt('2026-11-04 14:25'),'Value'=>1.853],
+];
+$opening=['timestamp'=>$dt('2026-10-23 12:00'),'value'=>0.0];
+$before=SuruConsumption::calculate($history,$latest,1.949);
+requireCase($before['24h']===96.0 && $before['7d']===234.0 && $before['30d']===234.0,'before install baseline: correct partial sums');
+$after=SuruConsumption::calculate($history,$latest,1.949,$opening);
+requireCase($after['24h']===96.0 && $after['7d']===234.0,'install baseline does not change 24h and 7d');
+requireCase($after['30d']===1949.0 && $after['365d']===1949.0,'install baseline completes 30d/365d without double count');
+requireCase(SuruConsumption::calculate($history,$latest,1.949,['timestamp'=>$dt('2026-11-04 12:00'),'value'=>0.0])['30d']===234.0,'reject baseline after first cloud reading');
+requireCase(SuruConsumption::calculate($history,$latest,1.949,['timestamp'=>$dt('2026-10-23 12:00'),'value'=>5.0])['30d']===234.0,'reject start value bigger than current reading');
+$future=$dt('2027-07-01 12:00');
+requireCase(SuruConsumption::calculate([], $future, 12.0, $opening)['30d']===null,'start outside 30d cannot count as 30d');
+requireCase(SuruConsumption::calculate([], $future, 12.0, $opening)['365d']===12000.0,'start still inside 365d retains total');
+requireCase(SuruConsumption::calculate([], $latest, 1.949, $opening)['30d']===1949.0,'known start may be used without archive');
 echo "ALL CONSUMPTION TESTS PASSED\n";
