@@ -174,54 +174,65 @@ $weeklyID=crc32('Consumption7d')&0x7fffffff;
 IPS_SetHidden($weeklyID,false);
 $m3->ApplyChanges();
 t($GLOBALS['hiddenVars'][$weeklyID]===false,'manual unhide is respected for unknown periods');
-// End-to-end: test an incorrect archive startup zero and a 10-day history.
-$GLOBALS['archiveEvents']=[];
-$m4=new MockModule();$m4->Create();
-$m4->props['Email']='me@example.org';$m4->props['Password']='fake';$m4->ApplyChanges();
+// Integration regression: a spurious zero logged at activation must not be
+// subtracted from the cumulative meter. 10 days of readings also populate
+// partial 30/365-day variables without waiting months.
+$GLOBALS['archiveEvents'] = [];
+$m4=new MockModule(); $m4->Create();
+$m4->props['Email']='me@example.org'; $m4->props['Password']='fake'; $m4->ApplyChanges();
 for($d=1;$d<=10;$d++) {
-  $GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-$d*86400,'Value'=>17.200-$d*.05];
+    $GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-$d*86400,'Value'=>17.200-$d*.05];
 }
 $GLOBALS['archiveEvents'][]=['TimeStamp'=>$today-86400+6*3600,'Value'=>0.0];
 $m4->mock->r=['reading'=>17.200,'measuredAt'=>gmdate('c',$today)];
 $m4->RequestAction('Poll',true);
-t(abs($m4->values['Consumption24h']-50.0)<.001,'daily value excludes false 0 in archive');
-t(abs($m4->values['Consumption7d']-350.0)<.001,'7d correctly includes seven available days');
-t(abs($m4->values['Consumption30d']-500.0)<.001,'30d includes all ten days');
-t(abs($m4->values['Consumption365d']-500.0)<.001,'365d includes all ten days');
+t(abs($m4->values['Consumption24h']-50.0)<.001,'24h cannot equal the 17.2 m3 meter total because of a zero archive artifact');
+t(abs($m4->values['Consumption7d']-350.0)<.001,'7-day value includes exactly seven existing daily deltas');
+t(abs($m4->values['Consumption30d']-500.0)<.001,'30-day value uses the ten available daily deltas');
+t(abs($m4->values['Consumption365d']-500.0)<.001,'365-day value uses the same ten available daily deltas');
+t($GLOBALS['hiddenVars'][(crc32('Consumption30d')&0x7fffffff)]===false,'30-day variable automatically available after one valid interval');
+// Update must also repair stale 0/total values from the previous version using
+// the stored archive, without changing account registration or archived rows.
 $m4->values['Consumption24h']=17200.0;
 $m4->values['Consumption30d']=0.0;
-$before=count($GLOBALS['archiveEvents']);
+$countBefore=count($GLOBALS['archiveEvents']);
 $m4->ApplyChanges();
-t(abs($m4->values['Consumption24h']-50.0)<.001 && abs($m4->values['Consumption30d']-500.0)<.001,'module update repairs existing bad values');
-t(count($GLOBALS['archiveEvents'])===$before,'archive untouched after re-computation');
+t(abs($m4->values['Consumption24h']-50.0)<.001 && abs($m4->values['Consumption30d']-500.0)<.001,'upgrading recalculates existing wrong values without a new reading');
+t(count($GLOBALS['archiveEvents'])===$countBefore,'no changes to original archive on upgrade');
 
-// Full integration regression for the newly installed meter (0 -> 1.949 m3).
+
+// Real-world upgrade scenario: meter installed at zero ~14 days before monitoring.
+// Three genuine cloud readings 03, 04, 05 Nov: 1.715, 1.853, 1.949 m3.
 $GLOBALS['archiveEvents']=[];
-$baselineModule=new MockModule();$baselineModule->Create();
-$baselineModule->props['Email']='me@example.org';
-$baselineModule->props['Password']='fake';
-$baselineModule->props['UseInstallReading']=true;
-$baselineModule->props['InstallDate']='2026-10-23';
-$baselineModule->props['InstallReadingM3']=0.0;
-$loc=new DateTimeZone('Europe/Berlin');
-$time=function(string $s)use($loc):int {return (new DateTimeImmutable($s,$loc))->getTimestamp();};
-$latest=$time('2026-11-05 13:51');
+$m5=new MockModule();$m5->Create();
+$m5->props['Email']='me@example.org';$m5->props['Password']='fake';
+$tz=new DateTimeZone('Europe/Berlin');
+$time=function($day, $hour)use($tz){return (new DateTimeImmutable($day.' '.$hour,$tz))->getTimestamp();};
+$last=$time('2026-11-05','13:51:00');
 $GLOBALS['archiveEvents']=[
- ['TimeStamp'=>$time('2026-11-03 14:25'),'Value'=>1.715],
- ['TimeStamp'=>$time('2026-11-04 14:25'),'Value'=>1.853],
+ ['TimeStamp'=>$time('2026-11-03','14:25:00'),'Value'=>1.715],
+ ['TimeStamp'=>$time('2026-11-04','14:25:00'),'Value'=>1.853],
 ];
-$baselineModule->ApplyChanges();
-$baselineModule->mock->r=['reading'=>1.949,'measuredAt'=>gmdate('c',$latest)];
-$baselineModule->RequestAction('Poll',true);
-t(abs($baselineModule->values['Consumption24h']-96.0)<.001,'real case 24h 96 L');
-t(abs($baselineModule->values['Consumption7d']-234.0)<.001,'real case 7d 234 L');
-t(abs($baselineModule->values['Consumption30d']-1949.0)<.001,'real case 30d 1949 L');
-t(abs($baselineModule->values['Consumption365d']-1949.0)<.001,'real case 365d 1949 L');
-$rawRows=count($GLOBALS['archiveEvents']);
-$baselineModule->ApplyChanges();
-t(count($GLOBALS['archiveEvents'])===$rawRows,'known starting counter never backdated into archive');
-t(abs($baselineModule->values['Consumption30d']-1949.0)<.001,'baseline survives ApplyChanges');
-$baselineModule->props['UseInstallReading']=false;
-$baselineModule->ApplyChanges();
-t(abs($baselineModule->values['Consumption30d']-234.0)<.001,'opt-out returns to archive-only partial total');
+$m5->props['UseInstallReading']=true;
+$m5->props['InstallDate']='2026-10-27';
+$m5->props['InstallReadingM3']=0.0;
+$m5->ApplyChanges();
+$m5->mock->r=['reading'=>1.949,'measuredAt'=>gmdate('c',$last)];
+$m5->RequestAction('Poll',true);
+t(abs($m5->values['Consumption24h']-96)<0.001,'real case: 24h is 96 litres, not total');
+t(abs($m5->values['Consumption7d']-234)<0.001,'real case: 7d stays 234 litres');
+t(abs($m5->values['Consumption30d']-1949)<0.001,'real case: 30d recovers 1949 litres since installation');
+t(abs($m5->values['Consumption365d']-1949)<0.001,'real case: 365d recovers 1949 litres since installation');
+t(str_contains($m5->values['Report'],'Berechnung 30d: Einbaustand'),'live report explains installation basis');
+$before=count($GLOBALS['archiveEvents']);
+$m5->ApplyChanges();
+t(abs($m5->values['Consumption30d']-1949)<0.001,'new baseline persists after ApplyChanges');
+t(count($GLOBALS['archiveEvents'])===$before,'installation reference never inserted into archive');
+// Invalid installation date does not change normal live measurements.
+$m5->props['InstallDate']='2026-02-30';$m5->ApplyChanges();
+t(abs($m5->values['Consumption30d']-234)<.001,'invalid date rejected, archive-only fallback');
+$m5->props['UseInstallReading']=false;$m5->ApplyChanges();
+t(abs($m5->values['Consumption30d']-234)<.001,'opt-out restores archive-only totals');
+// Never take a newly configured baseline as an invented most-recent daily sample.
+t(abs($m5->values['Consumption24h']-96)<.001,'opt-out preserves 24h measurement');
 echo "ALL MODULE TESTS PASSED\n";
