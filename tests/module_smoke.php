@@ -6,11 +6,15 @@ class IPSModuleStrict {
   public function Create():void {} public function ApplyChanges():void {}
   protected function RegisterPropertyString(string $a,string $b):void{$this->props[$a]=$b;}
   protected function RegisterPropertyInteger(string $a,int $b):void{$this->props[$a]=$b;}
+  protected function RegisterPropertyBoolean(string $a,bool $b):void{$this->props[$a]=$b;}
+  protected function RegisterPropertyFloat(string $a,float $b):void{$this->props[$a]=$b;}
   protected function RegisterAttributeString(string $a,string $b):void{$this->attrs[$a]=$b;}
   protected function RegisterAttributeInteger(string $a,int $b):void{$this->attrs[$a]=$b;}
   protected function RegisterAttributeFloat(string $a,float $b):void{$this->attrs[$a]=$b;}
   protected function ReadPropertyString(string $a):string{return $this->props[$a];}
   protected function ReadPropertyInteger(string $a):int{return $this->props[$a];}
+  protected function ReadPropertyBoolean(string $a):bool{return $this->props[$a];}
+  protected function ReadPropertyFloat(string $a):float{return $this->props[$a];}
   protected function ReadAttributeString(string $a):string{return $this->attrs[$a];}
   protected function ReadAttributeInteger(string $a):int{return $this->attrs[$a];}
   protected function ReadAttributeFloat(string $a):float{return $this->attrs[$a];}
@@ -190,4 +194,34 @@ $before=count($GLOBALS['archiveEvents']);
 $m4->ApplyChanges();
 t(abs($m4->values['Consumption24h']-50.0)<.001 && abs($m4->values['Consumption30d']-500.0)<.001,'module update repairs existing bad values');
 t(count($GLOBALS['archiveEvents'])===$before,'archive untouched after re-computation');
+
+// Full integration regression for the newly installed meter (0 -> 1.949 m3).
+$GLOBALS['archiveEvents']=[];
+$baselineModule=new MockModule();$baselineModule->Create();
+$baselineModule->props['Email']='me@example.org';
+$baselineModule->props['Password']='fake';
+$baselineModule->props['UseInstallReading']=true;
+$baselineModule->props['InstallDate']='2026-10-23';
+$baselineModule->props['InstallReadingM3']=0.0;
+$loc=new DateTimeZone('Europe/Berlin');
+$time=function(string $s)use($loc):int {return (new DateTimeImmutable($s,$loc))->getTimestamp();};
+$latest=$time('2026-11-05 13:51');
+$GLOBALS['archiveEvents']=[
+ ['TimeStamp'=>$time('2026-11-03 14:25'),'Value'=>1.715],
+ ['TimeStamp'=>$time('2026-11-04 14:25'),'Value'=>1.853],
+];
+$baselineModule->ApplyChanges();
+$baselineModule->mock->r=['reading'=>1.949,'measuredAt'=>gmdate('c',$latest)];
+$baselineModule->RequestAction('Poll',true);
+t(abs($baselineModule->values['Consumption24h']-96.0)<.001,'real case 24h 96 L');
+t(abs($baselineModule->values['Consumption7d']-234.0)<.001,'real case 7d 234 L');
+t(abs($baselineModule->values['Consumption30d']-1949.0)<.001,'real case 30d 1949 L');
+t(abs($baselineModule->values['Consumption365d']-1949.0)<.001,'real case 365d 1949 L');
+$rawRows=count($GLOBALS['archiveEvents']);
+$baselineModule->ApplyChanges();
+t(count($GLOBALS['archiveEvents'])===$rawRows,'known starting counter never backdated into archive');
+t(abs($baselineModule->values['Consumption30d']-1949.0)<.001,'baseline survives ApplyChanges');
+$baselineModule->props['UseInstallReading']=false;
+$baselineModule->ApplyChanges();
+t(abs($baselineModule->values['Consumption30d']-234.0)<.001,'opt-out returns to archive-only partial total');
 echo "ALL MODULE TESTS PASSED\n";
