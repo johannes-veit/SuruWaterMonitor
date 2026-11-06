@@ -30,3 +30,11 @@ manuelle Ausblendung erhalten. Vor der ersten gültigen Berechnung kann
 eine manuell eingeblendete Float-Variable technisch den Startwert 0 zeigen.
 
 Nur Lesen, WaterMonitor BASIC. Kein Home Assistant, keine Webinhalt-Kachel.
+UPDATE 0.1.7: INSTALLATIONS-NULLSTAND
+1. Nur die bestehende Symcon-Instanz oeffnen (kein neuer Zaehler).
+2. Unter Optionale Einstellungen Startstand beruecksichtigen aktivieren.
+3. Einbaudatum JJJJ-MM-TT, bei etwa 14 Tagen vor 06.11.2026 z.B. 2026-10-23.
+4. Einbaustand 0,000 m3 eintragen und Uebernehmen.
+5. Letzte 30/365 Tage beruecksichtigen dann alle 1.949 Liter seit Einbau,
+   letzte 7 Tage 234 Liter und 24 Stunden 96 Liter (Messung 05.11.2026).
+6. Keine historischen Daten werden ins Archiv zurueckgeschrieben.
